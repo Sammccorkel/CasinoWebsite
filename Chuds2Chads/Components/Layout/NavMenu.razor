@@ -1,0 +1,71 @@
+﻿@* 
+NavMenu.razor
+Updated to add game navigation links.
+*@
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">Chuds2Chads</a>
+        <UserInfoDisplay />
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="nav flex-column">
+        
+        @* Home *@
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+            </NavLink>
+        </div>
+
+        @* Games section label *@
+        <div class="nav-item px-3 nav-section-label">
+            <span class="nav-label-text">Games</span>
+        </div>
+
+        @* Roulette *@
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="games/roulette">
+                <span class="nav-icon" aria-hidden="true">🎡</span> Roulette
+            </NavLink>
+        </div>
+
+        @* Slots *@
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="games/slots">
+                <span class="nav-icon" aria-hidden="true">🎰</span> Slots
+            </NavLink>
+        </div>
+
+        @* Horse Race *@
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="games/horserace">
+                <span class="nav-icon" aria-hidden="true">🏇</span> Horse Race
+            </NavLink>
+        </div>
+
+        @* Blackjack – uncomment once blackjack page exists *@
+        @*
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="games/blackjack">
+                <span class="nav-icon" aria-hidden="true">🂡</span> Blackjack
+            </NavLink>
+        </div>
+        *@
+
+        @* Poker – uncomment once poker page exists *@
+        @*
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="games/poker">
+                <span class="nav-icon" aria-hidden="true">🃏</span> Poker
+            </NavLink>
+        </div>
+        *@
+
+    </nav>
+</div>
+

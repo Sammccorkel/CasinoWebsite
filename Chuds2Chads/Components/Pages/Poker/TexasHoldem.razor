@@ -1,0 +1,216 @@
+@page "/poker-game/{RoomId:guid}"
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using Chuds2Chads.Games.Blackjack
+@inject AuthenticationStateProvider AuthStateProvider
+@inject MultiplayerService MultiplayerService
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<div class="poker-table-wrapper">
+    <button class="btn-leave" @onclick="LeaveTableAsync">&#8592; Leave Table</button>
+
+    @if (table is null)
+    {
+        <h2 style="text-align:center; margin-top:20vh; color:white;">Loading Poker Table...</h2>
+    }
+    else
+    {
+        <div style="display:flex; justify-content:space-between; align-items:center; color:white; padding: 1rem 2rem;">
+            <div>
+                <strong>@table.RoomName</strong><br />
+                <span>Code: @table.RoomCode • Min Blind: @table.MinBet</span>
+            </div>
+            <div>Wallet: @table.Balance chips</div>
+        </div>
+
+        @if (table.IsClosing)
+        {
+            <div style="margin: 0 2rem 1rem; padding: 0.85rem 1rem; border-radius: 14px; color: white; background: rgba(245, 158, 11, 0.18); border: 1px solid rgba(245, 158, 11, 0.35);">
+                This table has been marked for deletion and will close after the current hand ends.
+            </div>
+        }
+
+        <div class="poker-felt">
+            <div class="community-center">
+                <div class="pot-display">
+                    POT: <span style="color: gold;">@table.Game.Pot</span>
+                    @if(table.Game.CurrentHighestBet > 0)
+                    {
+                        <div style="font-size: 0.8rem; color: #aaa;">Current Bet: @table.Game.CurrentHighestBet</div>
+                    }
+                </div>
+                <div class="community-cards">
+                    @foreach (var card in table.Game.CommunityCards)
+                    {
+                        <img src="@card.ImagePath" class="playing-card anim-slide-in" />
+                    }
+                </div>
+            </div>
+
+            @foreach (var player in table.Game.Players)
+            {
+                <div class="player-seat @GetSeatClass(player) @(table.Game.CurrentPlayer?.UserId == player.UserId ? "active-turn" : "") @(player.HasFolded ? "folded-state" : "")">
+                    @if (table.Game.Players.IndexOf(player) == table.Game.DealerIndex)
+                    {
+                        <div class="dealer-button">D</div>
+                    }
+
+                    <div class="player-info">
+                        <strong>@player.Name</strong>
+                        <div style="color: gold;">Stack: @player.Gold</div>
+                        @if(player.CurrentBet > 0) { <div class="bet-chip">Bet: @player.CurrentBet</div> }
+                        @if(player.IsDisconnected) { <div class="bet-chip" style="background:#7c3aed; color:white;">Disconnected</div> }
+                        @if(player.IsAllIn) { <div class="bet-chip" style="background: red; color: white;">ALL-IN</div> }
+                    </div>
+
+                    <div class="cards-container">
+                        @foreach (var card in player.Hand)
+                        {
+                            bool showCard = player.UserId == currentUserId || table.Game.Phase == PokerPhase.GameOver;
+                            <img src="@(showCard ? card.ImagePath : Card.CardBackPath)" class="playing-card anim-deal" />
+                        }
+                    </div>
+
+                    @if (table.Game.Phase != PokerPhase.Waiting && table.Game.Phase != PokerPhase.GameOver && table.Game.CurrentPlayer?.UserId == player.UserId && player.UserId == currentUserId)
+                    {
+                        <div class="betting-controls">
+                            <button class="btn-poker btn-fold" @onclick="() => TakeActionAsync(PokerAction.Fold)">Fold</button>
+
+                            @{
+                                long amountToCall = table.Game.CurrentHighestBet - player.CurrentBet;
+                                long actualCallAmount = Math.Min(player.Gold, amountToCall);
+                                bool canCheck = amountToCall <= 0;
+                            }
+
+                            <button class="btn-poker btn-check" @onclick="() => TakeActionAsync(PokerAction.Check)" disabled="@(!canCheck)">Check</button>
+                            <button class="btn-poker btn-call" @onclick="() => TakeActionAsync(PokerAction.Call)" disabled="@(canCheck)">Call @(actualCallAmount > 0 ? $"({actualCallAmount})" : "")</button>
+
+                            @if (player.Gold > actualCallAmount)
+                            {
+                                <div class="raise-group">
+                                    <input type="number" @bind="raiseAmount" min="1" max="@player.Gold" class="raise-input" placeholder="Amt" />
+                                    <button class="btn-poker btn-raise" @onclick="() => TakeActionAsync(PokerAction.Raise, raiseAmount)" disabled="@(raiseAmount <= 0 || raiseAmount > player.Gold)">Raise</button>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (table.Game.Phase == PokerPhase.GameOver)
+            {
+                <div class="winner-overlay anim-fade-in">
+                    <h1 style="color: gold; text-shadow: 0 0 20px gold;">@table.Game.WinnerName</h1>
+                    @if (table.Game.WinAmount > 0)
+                    {
+                        <h2>+@table.Game.WinAmount chips</h2>
+                    }
+                    <button class="btn-poker btn-raise" style="padding: 15px 30px; font-size: 1.2rem;" @onclick="StartRoundAsync">Play Next Hand</button>
+                </div>
+            }
+            else if (table.Game.Phase == PokerPhase.Waiting)
+            {
+                <div class="winner-overlay">
+                    <h2>@(table.IsPrivate ? "Preparing your private table..." : "Waiting for players...")</h2>
+                    @if (!table.IsPrivate && table.Game.Players.Count >= 2)
+                    {
+                        <button class="btn-poker btn-raise" style="padding: 15px 30px; font-size: 1.2rem;" @onclick="StartRoundAsync">Start Game</button>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid RoomId { get; set; }
+
+    private PokerTableViewModel? table;
+    private Guid currentUserId;
+    private long raiseAmount = 20;
+    private PeriodicTimer? refreshTimer;
+    private CancellationTokenSource? refreshCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        Guid.TryParse(authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out currentUserId);
+        await RefreshAsync();
+
+        refreshCts = new CancellationTokenSource();
+        refreshTimer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+        _ = RunRefreshAsync(refreshCts.Token);
+    }
+
+    private async Task RunRefreshAsync(CancellationToken token)
+    {
+        while (!token.IsCancellationRequested && refreshTimer is not null && await refreshTimer.WaitForNextTickAsync(token))
+        {
+            await RefreshAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        table = await MultiplayerService.GetPokerTableAsync(currentUserId, RoomId);
+        if (table is null)
+        {
+            Navigation.NavigateTo("/Dashboard");
+        }
+    }
+
+    private async Task StartRoundAsync()
+    {
+        await MultiplayerService.StartPokerRoundAsync(RoomId);
+        await RefreshAsync();
+    }
+
+    private async Task TakeActionAsync(PokerAction action, long amount = 0)
+    {
+        await MultiplayerService.ProcessPokerActionAsync(currentUserId, RoomId, action, amount);
+        raiseAmount = 20;
+        await RefreshAsync();
+    }
+
+    private string GetSeatClass(PokerPlayer player)
+    {
+        if (table is null)
+        {
+            return "seat-bottom-left";
+        }
+
+        var myIndex = table.Game.Players.FindIndex(p => p.UserId == currentUserId);
+        if (myIndex == -1)
+        {
+            return "seat-bottom-left";
+        }
+
+        var theirIndex = table.Game.Players.IndexOf(player);
+        var relativePosition = (theirIndex - myIndex + table.Game.Players.Count) % table.Game.Players.Count;
+
+        return relativePosition switch
+        {
+            0 => "seat-bottom-left",
+            1 => "seat-bottom-right",
+            2 => "seat-right",
+            3 => "seat-left",
+            _ => "seat-bottom-left"
+        };
+    }
+
+    private async Task LeaveTableAsync()
+    {
+        await MultiplayerService.LeaveRoomAsync(currentUserId, RoomId);
+        Navigation.NavigateTo("/Dashboard");
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        refreshCts?.Cancel();
+        refreshTimer?.Dispose();
+        refreshCts?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

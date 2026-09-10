@@ -1,0 +1,10 @@
+@media (max-width: 768px) {
+    .user-details {
+        display: none;
+    }
+    
+    .user-logged-in {
+        gap: 8px;
+        padding: 8px;
+    }
+}

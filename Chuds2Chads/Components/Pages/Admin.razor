@@ -1,0 +1,441 @@
+@page "/admin"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin")]
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Chuds2Chads.Data
+@using Chuds2Chads.Services
+@inject UserManager<ApplicationUser> UserManager
+@inject RoleManager<IdentityRole<Guid>> RoleManager
+@inject WalletService WalletService
+@inject NavigationManager Navigation
+
+<PageTitle>Admin Panel - Chuds to Chads Casino</PageTitle>
+
+<div class="admin-layout">
+    <div class="admin-header">
+        <div class="admin-header-left">
+            <span class="admin-badge">⚙ Admin</span>
+            <h1 class="admin-title">User Management</h1>
+        </div>
+        <div class="admin-header-right">
+            <button class="btn-create" @onclick="OpenCreateModal">+ New User</button>
+            <button class="btn-logout" @onclick="GoHome">← Back to Site</button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert @(statusIsError ? "alert-error" : "alert-success")">
+            @statusMessage
+        </div>
+    }
+
+    <div class="admin-search-bar">
+        <input class="search-input" type="text" placeholder="Search by username or email..."
+               @bind="searchQuery" @bind:event="oninput" />
+        <span class="search-count">@FilteredUsers.Count() users</span>
+    </div>
+
+    <div class="table-wrapper">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Balance</th>
+                    <th>Role</th>
+                    <th>Created</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (isLoading)
+                {
+                    <tr><td colspan="7" class="table-empty">Loading users...</td></tr>
+                }
+                else if (!FilteredUsers.Any())
+                {
+                    <tr><td colspan="7" class="table-empty">No users found.</td></tr>
+                }
+                else
+                {
+                    @foreach (var user in FilteredUsers)
+                    {
+                        <tr class="@(user.IsAdmin ? "row-admin" : "")">
+                            <td class="td-username">@user.UserName</td>
+                            <td class="td-email">@user.Email</td>
+                            <td class="td-balance">@user.Balance.ToString("N0") chips</td>
+                            <td>
+                                <span class="role-badge @(user.IsAdmin ? "role-admin" : "role-user")">
+                                    @(user.IsAdmin ? "Admin" : "User")
+                                </span>
+                            </td>
+                            <td class="td-date">@user.CreatedDate.ToString("MMM dd, yyyy")</td>
+                            <td>
+                                <span class="status-dot status-@user.Status.ToString().ToLower()"></span>
+                                @user.Status
+                            </td>
+                            <td class="td-actions">
+                                <button class="btn-edit" @onclick="() => OpenEditModal(user)">Edit</button>
+                                <button class="btn-delete" @onclick="() => OpenDeleteConfirm(user)"
+                                        disabled="@user.IsAdmin">Delete</button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+@if (editingUser != null)
+{
+    <div class="adm-backdrop" @onclick="CloseModals">
+        <div class="adm-modal" @onclick:stopPropagation>
+            <div class="adm-modal-header">
+                <h2>Edit User</h2>
+                <button class="adm-modal-close" @onclick="CloseModals">✕</button>
+            </div>
+            <div class="adm-modal-body">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input class="form-input" type="text" @bind="editUsername" />
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input class="form-input" type="email" @bind="editEmail" />
+                </div>
+                <div class="form-group">
+                    <label>New Password <span class="optional">(leave blank to keep current)</span></label>
+                    <input class="form-input" type="password" @bind="editPassword" placeholder="••••••••" />
+                </div>
+                <div class="form-group">
+                    <label>Balance (chips)</label>
+                    <input class="form-input" type="number" min="0" @bind="editBalance" />
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select class="form-input" @bind="editIsAdmin">
+                        <option value="false">User</option>
+                        <option value="true">Admin</option>
+                    </select>
+                </div>
+                @if (!string.IsNullOrEmpty(modalError))
+                {
+                    <div class="alert alert-error">@modalError</div>
+                }
+            </div>
+            <div class="adm-modal-footer">
+                <button class="btn-cancel" @onclick="CloseModals">Cancel</button>
+                <button class="btn-save" @onclick="SaveEdit" disabled="@isSaving">
+                    @(isSaving ? "Saving..." : "Save Changes")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Create Modal -->
+@if (showCreateModal)
+{
+    <div class="adm-backdrop" @onclick="CloseModals">
+        <div class="adm-modal" @onclick:stopPropagation>
+            <div class="adm-modal-header">
+                <h2>Create User</h2>
+                <button class="adm-modal-close" @onclick="CloseModals">✕</button>
+            </div>
+            <div class="adm-modal-body">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input class="form-input" type="text" @bind="createUsername" />
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input class="form-input" type="password" @bind="createPassword" placeholder="Min 8 chars, 1 digit" />
+                </div>
+                <div class="form-group">
+                    <label>Starting Balance (chips)</label>
+                    <input class="form-input" type="number" min="0" @bind="createBalance" />
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select class="form-input" @bind="createIsAdmin">
+                        <option value="false">User</option>
+                        <option value="true">Admin</option>
+                    </select>
+                </div>
+                @if (!string.IsNullOrEmpty(modalError))
+                {
+                    <div class="alert alert-error">@modalError</div>
+                }
+            </div>
+            <div class="adm-modal-footer">
+                <button class="btn-cancel" @onclick="CloseModals">Cancel</button>
+                <button class="btn-save" @onclick="SaveCreate" disabled="@isSaving">
+                    @(isSaving ? "Creating..." : "Create User")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Delete Confirm Modal -->
+@if (deletingUser != null)
+{
+    <div class="adm-backdrop" @onclick="CloseModals">
+        <div class="adm-modal adm-modal-sm" @onclick:stopPropagation>
+            <div class="adm-modal-header">
+                <h2>Delete User</h2>
+                <button class="adm-modal-close" @onclick="CloseModals">✕</button>
+            </div>
+            <div class="adm-modal-body">
+                <p>Are you sure you want to permanently delete <strong>@deletingUser.UserName</strong>?
+                   This cannot be undone.</p>
+                @if (!string.IsNullOrEmpty(modalError))
+                {
+                    <div class="alert alert-error">@modalError</div>
+                }
+            </div>
+            <div class="adm-modal-footer">
+                <button class="btn-cancel" @onclick="CloseModals">Cancel</button>
+                <button class="btn-delete-confirm" @onclick="ConfirmDelete" disabled="@isSaving">
+                    @(isSaving ? "Deleting..." : "Delete")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private record UserRow(Guid Id, string UserName, string Email, long Balance, bool IsAdmin,
+                           DateTime CreatedDate, UserPresenceStatus Status);
+
+    private List<UserRow> users = [];
+    private bool isLoading = true;
+    private string searchQuery = string.Empty;
+    private string statusMessage = string.Empty;
+    private bool statusIsError = false;
+
+    // Edit state
+    private UserRow? editingUser;
+    private string editUsername = string.Empty;
+    private string editEmail = string.Empty;
+    private string editPassword = string.Empty;
+    private long editBalance;
+    private string editIsAdmin = "false";
+
+    // Create state
+    private bool showCreateModal;
+    private string createUsername = string.Empty;
+    private string createPassword = string.Empty;
+    private long createBalance = 1000;
+    private string createIsAdmin = "false";
+
+    // Delete state
+    private UserRow? deletingUser;
+
+    private string modalError = string.Empty;
+    private bool isSaving = false;
+
+    private IEnumerable<UserRow> FilteredUsers =>
+        string.IsNullOrWhiteSpace(searchQuery)
+            ? users
+            : users.Where(u =>
+                u.UserName.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                u.Email.Contains(searchQuery, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync() => await LoadUsers();
+
+    private async Task LoadUsers()
+    {
+        isLoading = true;
+        var allUsers = UserManager.Users.ToList();
+        var rows = new List<UserRow>();
+
+        foreach (var u in allUsers)
+        {
+            var roles = await UserManager.GetRolesAsync(u);
+            var balance = await WalletService.GetBalanceAsync(u.Id) ?? 0;
+            rows.Add(new UserRow(u.Id, u.UserName ?? string.Empty, u.Email ?? string.Empty,
+                                 balance, roles.Contains("Admin"),
+                                 u.CreatedDate, u.PresenceStatus));
+        }
+
+        users = [.. rows.OrderBy(r => r.UserName)];
+        isLoading = false;
+    }
+
+    private void OpenEditModal(UserRow user)
+    {
+        editingUser = user;
+        editUsername = user.UserName;
+        editEmail = user.Email;
+        editPassword = string.Empty;
+        editBalance = user.Balance;
+        editIsAdmin = user.IsAdmin ? "true" : "false";
+        modalError = string.Empty;
+    }
+
+    private void OpenCreateModal()
+    {
+        showCreateModal = true;
+        createUsername = string.Empty;
+        createPassword = string.Empty;
+        createBalance = 1000;
+        createIsAdmin = "false";
+        modalError = string.Empty;
+    }
+
+    private void OpenDeleteConfirm(UserRow user)
+    {
+        deletingUser = user;
+        modalError = string.Empty;
+    }
+
+    private void CloseModals()
+    {
+        editingUser = null;
+        showCreateModal = false;
+        deletingUser = null;
+        modalError = string.Empty;
+    }
+
+    private async Task SaveEdit()
+    {
+        if (editingUser == null) return;
+        isSaving = true;
+        modalError = string.Empty;
+
+        var user = await UserManager.FindByIdAsync(editingUser.Id.ToString());
+        if (user == null) { modalError = "User not found."; isSaving = false; return; }
+
+        if (string.IsNullOrWhiteSpace(editUsername))
+        {
+            modalError = "Username cannot be empty.";
+            isSaving = false;
+            return;
+        }
+
+        // Update username
+        if (user.UserName != editUsername)
+        {
+            var setName = await UserManager.SetUserNameAsync(user, editUsername);
+            if (!setName.Succeeded) { modalError = string.Join(", ", setName.Errors.Select(e => e.Description)); isSaving = false; return; }
+        }
+
+        // Update email
+        if (!string.IsNullOrWhiteSpace(editEmail) && user.Email != editEmail)
+        {
+            user.Email = editEmail;
+            var setEmail = await UserManager.UpdateAsync(user);
+            if (!setEmail.Succeeded) { modalError = string.Join(", ", setEmail.Errors.Select(e => e.Description)); isSaving = false; return; }
+        }
+
+        // Update password
+        if (!string.IsNullOrWhiteSpace(editPassword))
+        {
+            var token = await UserManager.GeneratePasswordResetTokenAsync(user);
+            var setPwd = await UserManager.ResetPasswordAsync(user, token, editPassword);
+            if (!setPwd.Succeeded) { modalError = string.Join(", ", setPwd.Errors.Select(e => e.Description)); isSaving = false; return; }
+        }
+
+        // Adjust balance
+        if (editBalance != editingUser.Balance)
+        {
+            var diff = editBalance - editingUser.Balance;
+            await WalletService.AdjustBalanceAsync(user.Id, diff, "admin-adjustment");
+        }
+
+        // Update role
+        var wantAdmin = editIsAdmin == "true";
+        var isCurrentlyAdmin = await UserManager.IsInRoleAsync(user, "Admin");
+        if (wantAdmin && !isCurrentlyAdmin)
+            await UserManager.AddToRoleAsync(user, "Admin");
+        else if (!wantAdmin && isCurrentlyAdmin)
+            await UserManager.RemoveFromRoleAsync(user, "Admin");
+
+        isSaving = false;
+        CloseModals();
+        ShowStatus("User updated successfully.");
+        await LoadUsers();
+    }
+
+    private async Task SaveCreate()
+    {
+        isSaving = true;
+        modalError = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(createUsername) || string.IsNullOrWhiteSpace(createPassword))
+        {
+            modalError = "Username and password are required.";
+            isSaving = false;
+            return;
+        }
+
+        var email = createUsername + "@chuds2chads.local";
+        var newUser = new ApplicationUser
+        {
+            Id = Guid.NewGuid(),
+            UserName = createUsername,
+            Email = email,
+            EmailConfirmed = true,
+            CreatedDate = DateTime.UtcNow,
+            PresenceStatus = UserPresenceStatus.Offline
+        };
+
+        var result = await UserManager.CreateAsync(newUser, createPassword);
+        if (!result.Succeeded)
+        {
+            modalError = string.Join(", ", result.Errors.Select(e => e.Description));
+            isSaving = false;
+            return;
+        }
+
+        await WalletService.EnsureWalletAsync(newUser.Id, createBalance);
+
+        if (createIsAdmin == "true")
+            await UserManager.AddToRoleAsync(newUser, "Admin");
+        else
+            await UserManager.AddToRoleAsync(newUser, "User");
+
+        isSaving = false;
+        CloseModals();
+        ShowStatus("User created successfully.");
+        await LoadUsers();
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (deletingUser == null) return;
+        isSaving = true;
+        modalError = string.Empty;
+
+        var user = await UserManager.FindByIdAsync(deletingUser.Id.ToString());
+        if (user == null) { modalError = "User not found."; isSaving = false; return; }
+
+        var result = await UserManager.DeleteAsync(user);
+        if (!result.Succeeded)
+        {
+            modalError = string.Join(", ", result.Errors.Select(e => e.Description));
+            isSaving = false;
+            return;
+        }
+
+        isSaving = false;
+        CloseModals();
+        ShowStatus($"User '{deletingUser.UserName}' deleted.");
+        await LoadUsers();
+    }
+
+    private void GoHome() => Navigation.NavigateTo("/", forceLoad: true);
+
+    private void ShowStatus(string message, bool isError = false)
+    {
+        statusMessage = message;
+        statusIsError = isError;
+        _ = Task.Delay(4000).ContinueWith(_ => { statusMessage = string.Empty; InvokeAsync(StateHasChanged); });
+    }
+}

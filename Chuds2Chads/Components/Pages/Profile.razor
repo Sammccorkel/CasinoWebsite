@@ -1,0 +1,669 @@
+@page "/profile"
+@using Microsoft.AspNetCore.Components.Routing
+@using System.Security.Claims
+@using Chuds2Chads.Data.Entities
+@using Chuds2Chads.Services
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthStateProvider
+@inject WalletService WalletService
+@inject AvatarService AvatarService
+@attribute [Authorize]
+
+<PageTitle>Profile - Chuds to Chads Casino</PageTitle>
+
+<div class="profile-page">
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+
+    <div class="profile-container">
+        <div class="profile-header">
+            <NavLink href="/Dashboard" class="back-link">← Back to Casino</NavLink>
+            <h1>Player Profile</h1>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="alert alert-loading">Loading profile...</div>
+        }
+        else if (!string.IsNullOrEmpty(message))
+        {
+            <div class="alert alert-error">@message</div>
+        }
+        else if (user != null)
+        {
+            <div class="profile-card">
+                <div class="profile-avatar">
+                    <div class="avatar-canvas">
+                        @foreach (var layer in AvatarLayers)
+                        {
+                            var item = GetEquippedItem(layer);
+                            if (item is not null)
+                            {
+                                <img class="avatar-layer avatar-layer-@layer.ToString().ToLower()"
+                                     style="@GetLayerStyle(item)"
+                                     src="@item.ImagePath"
+                                     alt="@layer" />
+                            }
+                        }
+                    </div>
+                    <p class="avatar-name">@user.UserName</p>
+                </div>
+
+                <div class="profile-info">
+                    <h2>@user.UserName</h2>
+                    <p class="email">@user.Email</p>
+                    <p class="member-since">Member since @user.CreatedDate.ToString("MMMM d, yyyy")</p>
+                    <div class="profile-tags">
+                        <span class="tag tag-tier">Tier: Bronze</span>
+                        <span class="tag tag-status">Status: Active</span>
+                    </div>
+                </div>
+
+                <div class="profile-stats">
+                    <div class="stat stat-chips">
+                        <span class="stat-label">Balance</span>
+                        <span class="stat-value">@FormatChips(balance)</span>
+                    </div>
+                    <div class="stat stat-games">
+                        <span class="stat-label">Games Played</span>
+                        <span class="stat-value">0</span>
+                    </div>
+                    <div class="stat stat-wins">
+                        <span class="stat-label">Wins</span>
+                        <span class="stat-value">0</span>
+                    </div>
+                </div>
+
+                <div class="profile-grid">
+                    <div class="profile-panel">
+                        <h3 class="panel-title">Casino Snapshot</h3>
+                        <div class="panel-row">
+                            <span class="panel-label">Win Rate</span>
+                            <span class="panel-value">0%</span>
+                        </div>
+                        <div class="panel-row">
+                            <span class="panel-label">Favorite Game</span>
+                            <span class="panel-value">Blackjack</span>
+                        </div>
+                        <div class="panel-row">
+                            <span class="panel-label">Longest Streak</span>
+                            <span class="panel-value">0</span>
+                        </div>
+                        <div class="panel-row">
+                            <span class="panel-label">Last Seen</span>
+                            <span class="panel-value">Just now</span>
+                        </div>
+                    </div>
+
+                    <div class="profile-panel">
+                        <h3 class="panel-title">Recent Activity</h3>
+                        <ul class="activity-list">
+                            <li>Joined the casino lobby</li>
+                            <li>Viewed Blackjack tables</li>
+                            <li>Updated profile settings</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="profile-actions">
+                    <button class="btn-customize" @onclick="GoToCustomization">Customize Character</button>
+                    <button class="btn-shop" @onclick="GoToShop">Cosmetic Shop</button>
+                    <button class="btn-logout" @onclick="HandleLogout">Logout</button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+<style>
+.profile-page {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0a0118 0%, #1a0933 100%);
+    color: white;
+    font-family: 'Outfit', sans-serif;
+    position: relative;
+    overflow-x: hidden;
+}
+
+.bg-grid {
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(0, 255, 65, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 65, 0.02) 1px, transparent 1px);
+    background-size: 50px 50px;
+    animation: gridPan 30s linear infinite;
+    pointer-events: none;
+}
+
+@@keyframes gridPan {
+    0%   { transform: translate(0, 0); }
+    100% { transform: translate(50px, 50px); }
+}
+
+.bg-glow {
+    position: fixed;
+    width: 600px;
+    height: 600px;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.15;
+    pointer-events: none;
+    animation: glowFloat 20s ease-in-out infinite;
+}
+
+.bg-glow-1 {
+    background: radial-gradient(circle, #00ff41, transparent);
+    top: -10%;
+    left: -10%;
+}
+
+.bg-glow-2 {
+    background: radial-gradient(circle, #ffd700, transparent);
+    bottom: -10%;
+    right: -10%;
+    animation-delay: 10s;
+}
+
+@@keyframes glowFloat {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%       { transform: translate(30px, -30px) scale(1.1); }
+}
+
+.profile-container {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 3rem 3%;
+    position: relative;
+    animation: fadeInUp 0.6s ease-out;
+}
+
+@@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.profile-header {
+    margin-bottom: 2.5rem;
+}
+
+.profile-header h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2.5rem, 5vw, 4rem);
+    letter-spacing: 2px;
+    margin: 0.5rem 0 0;
+    background: linear-gradient(135deg, #00ff41, #ffd700);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.back-link {
+    color: #00ff41;
+    text-decoration: none;
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    opacity: 0.8;
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.back-link:hover {
+    opacity: 1;
+    transform: translateX(-4px);
+}
+
+.profile-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(0, 255, 65, 0.2);
+    border-radius: 20px;
+    padding: 3rem;
+    text-align: center;
+}
+
+.profile-avatar {
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.avatar-canvas {
+    position: relative;
+    width: 220px;
+    height: 220px;
+    margin: 0 auto;
+    border-radius: 16px;
+    overflow: hidden;
+    background: rgba(2, 6, 23, 0.6);
+    border: 1px solid rgba(0, 255, 65, 0.2);
+    box-shadow: 0 0 40px rgba(0, 255, 65, 0.08);
+}
+
+.avatar-layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transform-origin: center top;
+}
+
+.avatar-layer-body  { z-index: 1; }
+.avatar-layer-legs  { z-index: 2; }
+.avatar-layer-shoe  { z-index: 3; }
+.avatar-layer-torso { z-index: 4; }
+.avatar-layer-face  { z-index: 5; }
+.avatar-layer-head  { z-index: 6; }
+
+.avatar-name {
+    font-family: 'Russo One', sans-serif;
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.5);
+    margin: 0;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.profile-info h2 {
+    font-family: 'Russo One', sans-serif;
+    font-size: 2rem;
+    color: #ffd700;
+    margin: 0 0 0.4rem;
+}
+
+.email {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.9rem;
+    margin: 0.3rem 0;
+}
+
+.member-since {
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 0.8rem;
+    margin-top: 0.4rem;
+}
+
+.profile-tags {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.tag {
+    font-size: 0.75rem;
+    padding: 0.3rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 255, 65, 0.35);
+    color: #00ff41;
+}
+
+.tag-status {
+    border-color: rgba(0, 212, 255, 0.4);
+    color: #00d4ff;
+}
+
+.profile-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin: 2rem 0;
+    padding: 1.5rem 0;
+    border-top: 1px solid rgba(0, 255, 65, 0.15);
+    border-bottom: 1px solid rgba(0, 255, 65, 0.15);
+}
+
+.stat {
+    position: relative;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 1.2rem 1rem;
+    transition: all 0.3s ease;
+}
+
+.stat:hover {
+    transform: translateY(-3px);
+    border-color: var(--stat-accent, #00ff41);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+}
+
+.stat-chips  { --stat-accent: #00ff41; }
+.stat-games  { --stat-accent: #ffd700; }
+.stat-wins   { --stat-accent: #00d4ff; }
+
+.stat-label {
+    display: block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 0.5rem;
+}
+
+.stat-value {
+    display: block;
+    font-family: 'Russo One', sans-serif;
+    font-size: 1.8rem;
+    color: var(--stat-accent, #00ff41);
+    line-height: 1;
+}
+
+.profile-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.profile-panel {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 1.5rem;
+    text-align: left;
+    transition: border-color 0.3s ease;
+}
+
+.profile-panel:hover {
+    border-color: rgba(0, 255, 65, 0.25);
+}
+
+.panel-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.3rem;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.85);
+    margin-bottom: 1rem;
+}
+
+.panel-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.7rem;
+    font-size: 0.85rem;
+}
+
+.panel-label {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.panel-value {
+    font-family: 'Russo One', sans-serif;
+    color: #00ff41;
+    font-size: 0.9rem;
+}
+
+.activity-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.85rem;
+}
+
+.activity-list li {
+    padding: 0.5rem 0.7rem;
+    background: rgba(0, 255, 65, 0.04);
+    border-radius: 6px;
+    border-left: 2px solid rgba(0, 255, 65, 0.3);
+}
+
+.profile-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 2rem;
+}
+
+.btn-customize {
+    padding: 0.8rem 2rem;
+    background: linear-gradient(135deg, #00ff41, #ffd700);
+    border: none;
+    border-radius: 10px;
+    color: #0a0118;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-customize:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 255, 65, 0.4);
+}
+
+.btn-shop {
+    padding: 0.8rem 2rem;
+    background: rgba(255, 215, 0, 0.16);
+    color: #ffd700;
+    border: 1px solid rgba(255, 215, 0, 0.45);
+    border-radius: 10px;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-shop:hover {
+    background: rgba(255, 215, 0, 0.24);
+    border-color: rgba(255, 215, 0, 0.8);
+    transform: translateY(-2px);
+}
+
+.btn-logout {
+    padding: 0.8rem 2rem;
+    background: transparent;
+    color: #ff2e63;
+    border: 1px solid rgba(255, 46, 99, 0.5);
+    border-radius: 10px;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-logout:hover {
+    background: rgba(255, 46, 99, 0.1);
+    border-color: #ff2e63;
+    transform: translateY(-2px);
+}
+
+.alert {
+    padding: 1rem 1.5rem;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.alert-error {
+    background: rgba(255, 46, 99, 0.1);
+    color: #ff2e63;
+    border: 1px solid rgba(255, 46, 99, 0.4);
+}
+
+.alert-loading {
+    background: rgba(0, 255, 65, 0.06);
+    color: #00ff41;
+    border: 1px solid rgba(0, 255, 65, 0.3);
+}
+
+@@media (max-width: 700px) {
+    .profile-card {
+        padding: 2rem 1.5rem;
+    }
+
+    .profile-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .profile-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .profile-actions {
+        flex-direction: column;
+    }
+}
+</style>
+
+@code {
+    private UserProfile? user;
+    private AvatarCustomizationData? avatarData;
+    private string message = "";
+    private bool isLoading = true;
+    private long balance;
+
+    private sealed class ApiResult
+    {
+        public bool Ok { get; set; }
+        public int Status { get; set; }
+        public string? Text { get; set; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        await LoadProfileAsync();
+    }
+
+    private async Task LoadProfileAsync()
+    {
+        try
+        {
+            var result = await JS.InvokeAsync<ApiResult>("auth.currentUser");
+            if (result.Ok)
+            {
+                user = System.Text.Json.JsonSerializer.Deserialize<UserProfile>(result.Text ?? "",
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (user == null)
+                {
+                    message = "Profile data is unavailable.";
+                }
+                else
+                {
+                    if (Guid.TryParse(user.Id, out var parsedUserId))
+                    {
+                        avatarData = await AvatarService.GetCustomizationDataAsync(parsedUserId);
+                    }
+
+                    var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+                    var idClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                    if (Guid.TryParse(idClaim, out var userId))
+                    {
+                        balance = await WalletService.GetBalanceAsync(userId) ?? 0;
+                    }
+                }
+            }
+            else
+            {
+                message = !string.IsNullOrEmpty(result.Text)
+                    ? $"Failed to load profile: {result.Text}"
+                    : $"Failed to load profile with status {result.Status}.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private static readonly AvatarSlot[] AvatarLayers =
+    [
+        AvatarSlot.Body,
+        AvatarSlot.Legs,
+        AvatarSlot.Shoe,
+        AvatarSlot.Torso,
+        AvatarSlot.Face,
+        AvatarSlot.Head
+    ];
+
+    private static readonly Dictionary<string, string> AssetLayerStyleOverrides = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // All assets are normalized to 300×300 canvas with matched padding — no overrides needed.
+    };
+
+    private OwnedCosmeticDto? GetEquippedItem(AvatarSlot slot)
+    {
+        if (avatarData is null) return null;
+        if (!avatarData.EquippedObjectIds.TryGetValue(slot, out var id) || id is null) return null;
+        return avatarData.OwnedCosmetics.FirstOrDefault(i => i.ObjectId == id.Value);
+    }
+
+    private static string? GetLayerStyle(OwnedCosmeticDto item)
+    {
+        return AssetLayerStyleOverrides.TryGetValue(item.AssetKey, out var style)
+            ? style
+            : null;
+    }
+
+    private void GoToCustomization()
+    {
+        Navigation.NavigateTo("/customize");
+    }
+
+    private void GoToShop()
+    {
+        Navigation.NavigateTo("/shop");
+    }
+
+    private async Task HandleLogout()
+    {
+        try
+        {
+            var result = await JS.InvokeAsync<ApiResult>("auth.logout");
+            if (result.Ok)
+            {
+                Navigation.NavigateTo("/", forceLoad: true);
+            }
+            else
+            {
+                message = !string.IsNullOrEmpty(result.Text)
+                    ? $"Logout failed: {result.Text}"
+                    : $"Logout failed with status {result.Status}.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+        }
+    }
+
+    public class UserProfile
+    {
+        public string Id { get; set; } = "";
+        public string UserName { get; set; } = "";
+        public string Email { get; set; } = "";
+        public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+    }
+
+    private static string FormatChips(long chips)
+    {
+        if (chips >= 1_000_000) return $"${chips / 1_000_000.0:F1}M";
+        if (chips >= 1_000) return $"${chips / 1_000.0:F1}K";
+        return $"${chips}";
+    }
+}

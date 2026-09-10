@@ -1,0 +1,184 @@
+@page "/player-stats"
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IPlayerStatisticsService PlayerStatisticsService
+
+<PageTitle>Player Statistics</PageTitle>
+
+<div class="player-stats-page">
+    <div class="stats-bg-grid"></div>
+    <div class="stats-bg-glow stats-bg-glow-1"></div>
+    <div class="stats-bg-glow stats-bg-glow-2"></div>
+
+    <div class="stats-wrapper">
+        <a href="/Dashboard" class="stats-back-button">← Back to Dashboard</a>
+
+        <div class="stats-header-card">
+            <h1 class="stats-title">Player Statistics</h1>
+            <p class="stats-subtitle">Track your performance across the casino.</p>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="stats-message-card">
+                <p class="stats-loading">Loading stats...</p>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="stats-message-card error">
+                <p>@errorMessage</p>
+            </div>
+        }
+        else if (stats is null)
+        {
+            <div class="stats-message-card">
+                <p>No statistics available.</p>
+            </div>
+        }
+        else
+        {
+            <div class="stats-overview-grid">
+                <div class="stat-card featured">
+                    <span class="stat-label">Player</span>
+                    <span class="stat-value">@stats.UserName</span>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-label">Total Games Played</span>
+                    <span class="stat-value">@stats.TotalGamesPlayed</span>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-label">Total Wins</span>
+                    <span class="stat-value">@stats.TotalWins</span>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-label">Total Losses</span>
+                    <span class="stat-value">@stats.TotalLosses</span>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-label">Overall Win/Loss Ratio</span>
+                    <span class="stat-value">@stats.OverallWinLossRatio.ToString("0.00")</span>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-label">Most Played Game</span>
+                    <span class="stat-value">@stats.MostPlayedGame</span>
+                </div>
+
+                <div class="stat-card money">
+                    <span class="stat-label">Total Wagered</span>
+                    <span class="stat-value">@stats.TotalWagered</span>
+                </div>
+
+                <div class="stat-card money">
+                    <span class="stat-label">Total Won</span>
+                    <span class="stat-value positive">@stats.TotalWon</span>
+                </div>
+
+                <div class="stat-card money">
+                    <span class="stat-label">Total Lost</span>
+                    <span class="stat-value negative">@stats.TotalLost</span>
+                </div>
+
+                <div class="stat-card money">
+                    <span class="stat-label">Net Result</span>
+                    <span class="stat-value @(stats.NetResult >= 0 ? "positive" : "negative")">
+                        @stats.NetResult
+                    </span>
+                </div>
+            </div>
+
+            <div class="breakdown-card">
+                <div class="breakdown-header">
+                    <h2>Game Breakdown</h2>
+                    <p>See how you perform in each game mode.</p>
+                </div>
+
+                @if (stats.GameStats.Count == 0)
+                {
+                    <div class="stats-message-card compact">
+                        <p>No per-game statistics found.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-wrapper">
+                        <table class="stats-table">
+                            <thead>
+                                <tr>
+                                    <th>Game</th>
+                                    <th>Times Played</th>
+                                    <th>Wins</th>
+                                    <th>Losses</th>
+                                    <th>Win/Loss Ratio</th>
+                                    <th>Amount Wagered</th>
+                                    <th>Amount Won</th>
+                                    <th>Amount Lost</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var game in stats.GameStats)
+                                {
+                                    <tr>
+                                        <td class="game-name">@game.GameName</td>
+                                        <td>@game.TimesPlayed</td>
+                                        <td>@game.Wins</td>
+                                        <td>@game.Losses</td>
+                                        <td>@game.WinLossRatio.ToString("0.00")</td>
+                                        <td>@game.AmountWagered</td>
+                                        <td class="positive">@game.AmountWon</td>
+                                        <td class="negative">@game.AmountLost</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private PlayerStatisticsDto? stats;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (user.Identity is null || !user.Identity.IsAuthenticated)
+            {
+                errorMessage = "You must be logged in to view player statistics.";
+                return;
+            }
+
+            var userIdValue = user.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (!Guid.TryParse(userIdValue, out var userId))
+            {
+                errorMessage = "Unable to determine the current user.";
+                return;
+            }
+
+            stats = await PlayerStatisticsService.GetPlayerStatisticsAsync(userId);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading statistics: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

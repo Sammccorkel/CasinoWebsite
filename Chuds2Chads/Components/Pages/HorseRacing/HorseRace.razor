@@ -1,0 +1,400 @@
+@page "/HorseRacing/horserace"
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthStateProvider
+@inject Chuds2Chads.Services.WalletService WalletService
+@inject Chuds2Chads.Services.HorseRaceService RaceService
+
+<PageTitle>Horse Race - C2C Casino</PageTitle>
+
+<div class="game-page horserace-page">
+    <div class="ambient-glow glow-green"></div>
+    <div class="ambient-glow glow-gold"></div>
+
+    <div class="game-header">
+        <a href="/" class="back-link nav-leave-link">&#8592; Back to Casino</a>
+        <h1 class="game-title-header">Horse <span class="highlight">Racing</span></h1>
+        @if (userId != Guid.Empty)
+        {
+            <div class="balance-pill">&#127183; @balance chips</div>
+        }
+        else
+        {
+            <div class="balance-pill guest">Guest Mode</div>
+        }
+    </div>
+
+    <div class="race-layout">
+
+        <!-- ══ TRACK ════════════════════════════════════════════════════════ -->
+        <div class="track-section">
+            <div class="track-outer-wrap @(isRacing ? "track-racing-glow" : "")">
+
+                <div class="grass-strip grass-top"></div>
+                <div class="grass-strip grass-bottom"></div>
+
+                <!-- Start gate -->
+                <div class="gate-panel gate-start">
+                    <div class="gate-label">START</div>
+                    @for (int i = 0; i < horses.Count; i++)
+                    {
+                        <div class="gate-cell">@(i + 1)</div>
+                    }
+                </div>
+
+                <!-- Finish line -->
+                <div class="gate-panel gate-finish">
+                    <div class="finish-checker"></div>
+                    <div class="gate-label finish-label">FINISH</div>
+                </div>
+
+                <!-- Dirt track with horses -->
+                <div class="dirt-track">
+                    @for (int i = 0; i < horses.Count; i++)
+                    {
+                        int    hi         = i;
+                        var    h          = horses[hi];
+                        double pct        = hi < horsePositions.Count ? horsePositions[hi] : 0;
+                        double clampedPct = Math.Min(Math.Max(pct, 0), 100);
+                        bool   isWinner   = raceComplete && hi == winnerIndex;
+                        bool   isBet      = hi == betHorseIndex;
+
+                        <div class="lane @(isBet ? "lane-selected" : "") @(isWinner ? "lane-winner" : "")">
+                            <div class="lane-num">@(hi + 1)</div>
+
+                            <!--
+                                The horse-racer sits inside .lane which already has
+                                left:52px padding-left via the start gate.
+                                We interpolate from 0% to 100% of the available
+                                run zone using a CSS custom property.
+                            -->
+                            <div class="horse-racer @(isRacing ? "horse-gallop" : "") @(isWinner ? "horse-cross-finish" : "")"
+                                 style="--pct: @(clampedPct.ToString("F2", System.Globalization.CultureInfo.InvariantCulture));">
+                                <div class="jockey-dot" style="background:@LaneColors[hi % LaneColors.Length]"></div>
+                                <span class="horse-emoji">@h.Emoji</span>
+                                @if (isWinner)
+                                {
+                                    <span class="winner-flag-emoji">&#127937;</span>
+                                }
+                            </div>
+
+                            @if (hi < horses.Count - 1)
+                            {
+                                <div class="lane-divider"></div>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <!-- Distance pole markers -->
+                <div class="distance-markers">
+                    <span class="dist-mark" style="left:25%">&#188;</span>
+                    <span class="dist-mark" style="left:50%">&#189;</span>
+                    <span class="dist-mark" style="left:75%">&#190;</span>
+                </div>
+            </div>
+
+            <!-- Result banner -->
+            @if (raceComplete && winnerIndex >= 0)
+            {
+                <div class="race-result-banner animate-pop @(lastWon ? "banner-win" : "banner-loss")">
+                    <span class="winner-emoji-big">@horses[winnerIndex].Emoji</span>
+                    <div class="banner-text">
+                        <strong class="winner-name">@horses[winnerIndex].Name</strong> wins!
+                        @if (lastWon)
+                        {
+                            <div class="banner-sub">&#127881; You picked the winner!
+                                <span class="chip-gain">+@payoutAmount chips</span>
+                            </div>
+                        }
+                        else if (betHorseIndex >= 0)
+                        {
+                            <div class="banner-sub">
+                                @horses[betHorseIndex].Name didn't make it. Better luck next race.
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- ══ SIDEBAR ══════════════════════════════════════════════════════ -->
+        <div class="race-sidebar">
+
+            <!-- Horse picker -->
+            <div class="panel">
+                <h3 class="panel-heading">&#127939; Pick Your Horse</h3>
+                <div class="horse-grid">
+                    @for (int i = 0; i < horses.Count; i++)
+                    {
+                        int hi = i;
+                        var h  = horses[hi];
+                        <button class="horse-card @(betHorseIndex == hi ? "horse-card-selected" : "")"
+                                @onclick="() => betHorseIndex = hi"
+                                disabled="@isRacing">
+                            <span class="lane-pip" style="background:@LaneColors[hi % LaneColors.Length]">@(hi+1)</span>
+                            <span class="hc-emoji">@h.Emoji</span>
+                            <span class="hc-name">@h.Name</span>
+                            <span class="hc-odds">@Services.HorseRaceService.FormatOdds(h.Odds)</span>
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <!-- Stake -->
+            <div class="panel">
+                <h3 class="panel-heading">&#127922; Stake</h3>
+
+                <div class="chip-row">
+                    @foreach (var chip in chipValues)
+                    {
+                        <button class="chip-btn chip-@GetChipColor(chip) @(selectedChip == chip && !useCustomBet ? "chip-selected" : "")"
+                                @onclick="() => SelectPreset(chip)"
+                                disabled="@isRacing">@chip</button>
+                    }
+                </div>
+
+                <div class="custom-bet-row">
+                    <label class="custom-label">Custom amount</label>
+                    <input class="custom-input @(useCustomBet ? "custom-input-active" : "")"
+                           type="number"
+                           min="1"
+                           @bind="customBetRaw"
+                           @bind:event="oninput"
+                           @onfocus="() => useCustomBet = true"
+                           disabled="@isRacing"
+                           placeholder="Enter chips…" />
+                </div>
+
+                <div class="stake-display">
+                    Betting: <strong class="stake-amount">@ActiveStake chips</strong>
+                </div>
+            </div>
+
+            <!-- Start -->
+            <button class="start-btn @(isRacing ? "start-btn-active" : "")"
+                    @onclick="StartRace"
+                    disabled="@(isRacing || betHorseIndex < 0 || ActiveStake <= 0)">
+                @if (isRacing)
+                {
+                    <span class="spinner-ring"></span>
+                    <span>Racing…</span>
+                }
+                else
+                {
+                    <span>&#127937; Start Race!</span>
+                }
+            </button>
+
+            @if (!string.IsNullOrEmpty(statusMsg))
+            {
+                <div class="status-msg @(lastWon ? "msg-win" : "msg-loss")">@statusMsg</div>
+            }
+
+            <!-- History -->
+            @if (history.Count > 0)
+            {
+                <div class="panel panel-history">
+                    <h4 class="panel-heading">Recent Races</h4>
+                    @foreach (var hr in history.TakeLast(6).Reverse())
+                    {
+                        <div class="hist-row @(hr.Won ? "hist-win" : "hist-loss")">
+                            <span>@hr.WinnerEmoji @hr.WinnerName</span>
+                            <span class="hist-chip">@(hr.Won ? $"+{hr.Payout}" : $"-{hr.Bet}")</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private static readonly string[] LaneColors =
+        ["#e63946", "#f4a261", "#2a9d8f", "#457b9d", "#9b5de5", "#f72585"];
+
+    // ── Auth ───────────────────────────────────────────────────────────────
+    private Guid userId  = Guid.Empty;
+    private long balance = 0;
+
+    // ── Betting ────────────────────────────────────────────────────────────
+    private readonly int[] chipValues = [10, 25, 50, 100, 250];
+    private int    selectedChip = 25;
+    private bool   useCustomBet = false;
+    private string customBetRaw = "";
+
+    private int ActiveStake
+    {
+        get
+        {
+            if (useCustomBet && int.TryParse(customBetRaw, out int v) && v > 0)
+                return v;
+            return selectedChip;
+        }
+    }
+
+    private void SelectPreset(int chip)
+    {
+        selectedChip = chip;
+        useCustomBet = false;
+        customBetRaw = "";
+    }
+
+    // ── Race state ─────────────────────────────────────────────────────────
+    private int    betHorseIndex = -1;
+    private bool   isRacing      = false;
+    private bool   raceComplete  = false;
+    private bool   lastWon       = false;
+    private int    winnerIndex   = -1;
+    private long   payoutAmount  = 0;
+    private string statusMsg     = "";
+
+    // 0 = start gate position, 100 = finish line position
+    private List<double> horsePositions = new();
+
+    private IReadOnlyList<Services.HorseRaceService.Horse> horses =
+        new List<Services.HorseRaceService.Horse>();
+
+    private record RaceHistory(
+        string WinnerName, string WinnerEmoji,
+        bool Won, long Payout, int Bet);
+
+    private readonly List<RaceHistory> history = new();
+
+    private string GetChipColor(int v) => v switch
+    {
+        10  => "blue",
+        25  => "red",
+        50  => "purple",
+        100 => "gold",
+        _   => "black"
+    };
+
+    // ── Init ───────────────────────────────────────────────────────────────
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user  = state.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var idClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (Guid.TryParse(idClaim, out var parsed))
+            {
+                userId  = parsed;
+                balance = (await WalletService.GetBalanceAsync(userId)) ?? 0;
+            }
+        }
+
+        horses         = Services.HorseRaceService.Horses.Take(4).ToList();
+        horsePositions = Enumerable.Repeat(0.0, horses.Count).ToList();
+    }
+
+    // ── Race ───────────────────────────────────────────────────────────────
+    private async Task StartRace()
+    {
+        if (isRacing || betHorseIndex < 0 || ActiveStake <= 0) return;
+
+        int stake = ActiveStake;
+
+        // Charge the bet
+        if (userId != Guid.Empty)
+        {
+            bool placed = await WalletService.TryPlaceBetAsync(
+                userId, stake,
+                $"horserace-bet-{DateTime.UtcNow:yyyyMMddHHmmss}");
+
+            if (!placed) { statusMsg = "Insufficient chips."; return; }
+            balance -= stake;
+        }
+
+        // ── Reset ─────────────────────────────────────────────────────────
+        isRacing     = true;
+        raceComplete = false;
+        statusMsg    = "";
+        winnerIndex  = -1;
+        horsePositions = Enumerable.Repeat(0.0, horses.Count).ToList();
+        await InvokeAsync(StateHasChanged);
+
+        // Brief pause so the player sees horses back at the gate
+        await Task.Delay(350);
+
+        // ── Simulate (equal-probability winner) ───────────────────────────
+        var result = RaceService.SimulateRace(horses.Count, stake);
+
+        int resolved = horses.ToList().FindIndex(h => h.Name == result.Winner.Name);
+        if (resolved < 0) resolved = 0;
+
+        // ── Stream frames to the browser ──────────────────────────────────
+        // Target ~20 rendered frames per second.
+        // The service produces many simulation steps; we skip to keep it
+        // smooth but not instant.
+        var frames = result.Frames;
+        int skip   = Math.Max(1, frames.Count / 55);   // ~55 render ticks
+
+        for (int f = 0; f < frames.Count; f += skip)
+        {
+            var frame = frames[f];
+            for (int i = 0; i < horsePositions.Count && i < frame.Positions.Count; i++)
+            {
+                // Keep strictly below 100 while racing so the finish snap is visible
+                horsePositions[i] = Math.Clamp(frame.Positions[i], 0.0, 99.5);
+            }
+
+            // Check if any horse has reached the finish line
+            int firstWinner = horsePositions.FindIndex(p => p >= 100);
+            if (firstWinner >= 0)
+            {
+                winnerIndex = firstWinner;
+                // Set the winner to 100, others to their current clamped position
+                for (int i = 0; i < horsePositions.Count; i++)
+                {
+                    if (i != firstWinner)
+                        horsePositions[i] = Math.Min(horsePositions[i], 95.0);
+                }
+                horsePositions[firstWinner] = 100.0;
+                break; // Stop the animation early
+            }
+
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(50);   // 50 ms ≈ 20 fps
+        }
+
+        // ── Final snap if no winner detected during animation ─────────────
+        if (winnerIndex < 0)
+        {
+            for (int i = 0; i < horsePositions.Count; i++)
+                horsePositions[i] = i == resolved ? 100.0 : Math.Clamp(horsePositions[i], 0, 96.0);
+
+            winnerIndex = resolved;
+        }
+
+        // ── Payout ────────────────────────────────────────────────────────
+        bool won = betHorseIndex == winnerIndex;
+        payoutAmount = won ? result.Payout : 0;
+
+        if (won && userId != Guid.Empty)
+        {
+            await WalletService.CreditPayoutAsync(
+                userId, payoutAmount,
+                $"horserace-payout-{DateTime.UtcNow:yyyyMMddHHmmss}");
+            balance += payoutAmount;
+        }
+
+        lastWon   = won;
+        statusMsg = won
+            ? $"Winner! +{payoutAmount} chips!"
+            : $"Lost {stake} chips.";
+
+        isRacing     = false;
+        raceComplete = true;
+
+        history.Add(new RaceHistory(
+            horses[winnerIndex].Name,
+            horses[winnerIndex].Emoji,
+            won, payoutAmount, stake));
+
+        await InvokeAsync(StateHasChanged);
+    }
+}

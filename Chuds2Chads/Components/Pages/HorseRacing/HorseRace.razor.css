@@ -1,0 +1,632 @@
+/* ═══════════════════════════════════════════════════════════════════
+   HorseRace.razor.css  –  Lane-based straight racetrack
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Page shell ─────────────────────────────────────────────────── */
+.game-page {
+    min-height: 100vh;
+    background: linear-gradient(160deg, #0b0f1a 0%, #0d1f0f 60%, #0a1508 100%);
+    color: #fff;
+    font-family: 'Outfit', 'Segoe UI', sans-serif;
+    position: relative;
+    overflow-x: hidden;
+    padding-bottom: 4rem;
+}
+
+.ambient-glow {
+    position: fixed;
+    width: 600px;
+    height: 600px;
+    border-radius: 50%;
+    filter: blur(140px);
+    opacity: .08;
+    pointer-events: none;
+    animation: glowDrift 22s ease-in-out infinite;
+}
+.glow-green { background: radial-gradient(circle, #00e676, transparent); top: -15%; left: -10%; }
+.glow-gold  { background: radial-gradient(circle, #ffd700, transparent); top: 50%; right: -10%; animation-delay: 6s; }
+
+@keyframes glowDrift {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%       { transform: translate(40px, -40px) scale(1.12); }
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.game-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 3%;
+    background: rgba(5, 10, 5, .88);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(0, 230, 118, .15);
+    position: sticky;
+    top: 0;
+    z-index: 60;
+}
+
+.back-link {
+    color: rgba(255,255,255,.55);
+    text-decoration: none;
+    font-size: .9rem;
+    transition: color .2s;
+}
+.back-link:hover { color: #00e676; }
+
+.nav-leave-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 10px 20px;
+    border-radius: 6px;
+    border: 1px solid #ffd700;
+    background: rgba(0, 0, 0, 0.5);
+    color: #ffd700;
+    font-weight: 700;
+}
+
+.nav-leave-link:hover {
+    color: #000;
+    background: #ffd700;
+}
+
+.game-title-header {
+    font-family: 'Bebas Neue', 'Impact', sans-serif;
+    font-size: 2rem;
+    letter-spacing: 3px;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+.highlight {
+    background: linear-gradient(135deg, #00e676 0%, #ffd700 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.balance-pill {
+    padding: .4rem 1.1rem;
+    background: rgba(0,230,118,.1);
+    border: 1px solid rgba(0,230,118,.3);
+    border-radius: 50px;
+    font-size: .88rem;
+    color: #00e676;
+    font-weight: 700;
+    letter-spacing: .5px;
+}
+.balance-pill.guest {
+    color: rgba(255,255,255,.45);
+    border-color: rgba(255,255,255,.18);
+    background: rgba(255,255,255,.04);
+}
+
+/* ── Layout ─────────────────────────────────────────────────────── */
+.race-layout {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 1.5rem;
+    max-width: 1380px;
+    margin: 1.8rem auto 0;
+    padding: 0 2.5%;
+    align-items: start;
+}
+
+@media (max-width: 1024px) {
+    .race-layout { grid-template-columns: 1fr; }
+}
+
+/* ── Track outer ────────────────────────────────────────────────── */
+.track-section { display: flex; flex-direction: column; gap: 1.2rem; }
+
+.track-outer-wrap {
+    position: relative;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 2px solid rgba(255,255,255,.1);
+    background: transparent;
+    transition: box-shadow .4s;
+}
+
+.track-racing-glow {
+    box-shadow: 0 0 0 3px rgba(255,215,0,.35), 0 0 60px rgba(255,215,0,.12);
+}
+
+/* ── Grass strips ───────────────────────────────────────────────── */
+.grass-strip {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.grass-top {
+    top: 0;
+    height: 36px;
+    background:
+        repeating-linear-gradient(90deg,
+            #1a4a1a 0px, #1a4a1a 6px,
+            #226622 6px, #226622 12px);
+    border-bottom: 3px solid #0d2e0d;
+}
+
+.grass-bottom {
+    bottom: 0;
+    height: 36px;
+    background:
+        repeating-linear-gradient(90deg,
+            #1a4a1a 0px, #1a4a1a 6px,
+            #226622 6px, #226622 12px);
+    border-top: 3px solid #0d2e0d;
+}
+
+/* ── Gate panels ────────────────────────────────────────────────── */
+.gate-panel {
+    position: absolute;
+    top: 36px;
+    bottom: 36px;
+    z-index: 10;
+    width: 52px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-around;
+    padding: 4px 0;
+}
+
+.gate-start {
+    left: 0;
+    background: linear-gradient(180deg, #1b2e1b, #223322);
+    border-right: 3px solid #ffd700;
+}
+
+.gate-finish {
+    right: 0;
+    background: transparent;
+    border-left: 4px solid transparent;
+    width: 32px;
+    overflow: hidden;
+}
+
+.gate-label {
+    font-size: .55rem;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: #ffd700;
+    text-transform: uppercase;
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 2px;
+}
+
+.gate-cell {
+    width: 32px;
+    height: calc((100% - 20px) / 4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .7rem;
+    font-weight: 800;
+    color: rgba(255,255,255,.7);
+    border-top: 1px solid rgba(255,215,0,.2);
+}
+
+/* ── Checkerboard finish line ───────────────────────────────────── */
+.finish-checker {
+    position: absolute;
+    inset: 0;
+    background-image:
+        repeating-conic-gradient(#fff 0% 25%, #000 0% 50%);
+    background-size: 14px 14px;
+    opacity: .85;
+}
+
+/* ── Dirt track ─────────────────────────────────────────────────── */
+.dirt-track {
+    position: relative;
+    /* push content past start gate and grass strips */
+    margin: 36px 32px 36px 52px;
+    display: flex;
+    flex-direction: column;
+    background: #8b6914;
+    border-left: none;
+    border-right: none;
+    min-height: 240px;
+}
+
+/* ── Lane ───────────────────────────────────────────────────────── */
+.lane {
+    position: relative;
+    height: 68px;
+    display: flex;
+    align-items: center;
+    background: linear-gradient(180deg,
+        #9c7620 0%,
+        #a07c22 30%,
+        #8b6914 70%,
+        #7a5c10 100%);
+    overflow: hidden;
+    transition: background .3s;
+}
+
+/* subtle dirt texture via noise */
+.lane::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Ccircle cx='1' cy='1' r='.7' fill='rgba(0,0,0,0.07)'/%3E%3Ccircle cx='3' cy='3' r='.5' fill='rgba(255,255,255,0.04)'/%3E%3C/svg%3E");
+    pointer-events: none;
+    opacity: .6;
+}
+
+.lane-selected {
+    background: linear-gradient(180deg,
+        #b38a28 0%,
+        #c49530 40%,
+        #a07c22 100%);
+    box-shadow: inset 0 0 0 2px rgba(255,215,0,.55);
+}
+
+.lane-winner {
+    background: linear-gradient(180deg,
+        #c8a830 0%,
+        #d4b840 40%,
+        #b89020 100%) !important;
+    box-shadow: inset 0 0 0 2px rgba(255,220,50,.8),
+                0 0 24px rgba(255,220,50,.3);
+}
+
+/* lane number badge */
+.lane-num {
+    position: absolute;
+    left: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(0,0,0,.55);
+    border: 1px solid rgba(255,255,255,.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .65rem;
+    font-weight: 800;
+    color: rgba(255,255,255,.9);
+    z-index: 4;
+    pointer-events: none;
+}
+
+/* lane divider (dashed white line like a real track) */
+.lane-divider {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: repeating-linear-gradient(
+        90deg,
+        rgba(255,255,255,.55) 0px,
+        rgba(255,255,255,.55) 14px,
+        transparent 14px,
+        transparent 28px
+    );
+    z-index: 5;
+    pointer-events: none;
+}
+
+/* ── Distance markers ───────────────────────────────────────────── */
+.distance-markers {
+    position: absolute;
+    bottom: 36px;
+    left: 52px;
+    right: 32px;
+    height: 0;
+    pointer-events: none;
+    z-index: 8;
+}
+
+.dist-mark {
+    position: absolute;
+    transform: translateX(-50%);
+    bottom: 4px;
+    font-size: .6rem;
+    color: rgba(255,255,255,.35);
+    font-weight: 700;
+}
+
+/* pole */
+.dist-mark::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 14px;
+    width: 2px;
+    height: 36px;
+    background: repeating-linear-gradient(
+        180deg,
+        rgba(255,255,255,.35) 0px, rgba(255,255,255,.35) 4px,
+        transparent 4px, transparent 8px
+    );
+    transform: translateX(-50%);
+}
+
+/* ── Horse racer ────────────────────────────────────────────────── */
+.horse-racer {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    left: calc(34px + (var(--pct) / 100) * (100% - 66px));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    z-index: 10;
+    transition: left .08s linear;
+    pointer-events: none;
+    user-select: none;
+}
+
+.jockey-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.7);
+    flex-shrink: 0;
+}
+
+.horse-emoji {
+    font-size: 2rem;
+    line-height: 1;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,.55));
+}
+
+.winner-flag-emoji {
+    font-size: 1.1rem;
+    animation: flagWave .4s ease-in-out infinite alternate;
+}
+@keyframes flagWave {
+    from { transform: rotate(-8deg); }
+    to   { transform: rotate(8deg); }
+}
+
+/* gallop bob */
+.horse-gallop .horse-emoji {
+    animation: horseGallop .28s ease-in-out infinite alternate;
+}
+@keyframes horseGallop {
+    from { transform: translateY(0) rotate(-3deg); }
+    to   { transform: translateY(-5px) rotate(3deg); }
+}
+
+/* winner bounce */
+.horse-cross-finish .horse-emoji {
+    animation: winnerBounce .45s ease-in-out 4;
+    filter: drop-shadow(0 0 14px #ffd700);
+}
+@keyframes winnerBounce {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50%       { transform: translateY(-10px) scale(1.2); }
+}
+
+/* ── Result banner ──────────────────────────────────────────────── */
+.race-result-banner {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.6rem;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+}
+.banner-win {
+    background: rgba(0,230,118,.1);
+    border: 1px solid rgba(0,230,118,.4);
+    color: #00e676;
+}
+.banner-loss {
+    background: rgba(255,46,99,.08);
+    border: 1px solid rgba(255,46,99,.3);
+    color: #ff2e63;
+}
+.winner-emoji-big { font-size: 2.6rem; }
+.winner-name { color: #ffd700; font-size: 1.15rem; }
+.banner-sub { margin-top: .3rem; font-size: .9rem; color: rgba(255,255,255,.75); font-weight: 400; }
+.chip-gain { color: #00e676; font-weight: 700; }
+
+.animate-pop {
+    animation: popIn .5s cubic-bezier(.175,.885,.32,1.275);
+}
+@keyframes popIn {
+    from { opacity: 0; transform: scale(.75) translateY(16px); }
+    to   { opacity: 1; transform: scale(1)   translateY(0); }
+}
+
+/* ── Sidebar ────────────────────────────────────────────────────── */
+.race-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+}
+
+.panel {
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 14px;
+    padding: 1.3rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: .9rem;
+}
+
+.panel-heading {
+    font-family: 'Russo One', 'Impact', sans-serif;
+    font-size: 1rem;
+    color: #ffd700;
+    margin: 0;
+    letter-spacing: .5px;
+}
+
+/* ── Horse cards ────────────────────────────────────────────────── */
+.horse-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: .55rem;
+}
+
+.horse-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .25rem;
+    padding: .75rem .5rem;
+    background: rgba(255,255,255,.04);
+    border: 1.5px solid rgba(255,255,255,.1);
+    border-radius: 10px;
+    color: #fff;
+    font-family: 'Outfit', sans-serif;
+    cursor: pointer;
+    transition: all .22s;
+    position: relative;
+}
+.horse-card:hover:not(:disabled) {
+    background: rgba(0,230,118,.07);
+    border-color: rgba(0,230,118,.35);
+    transform: translateY(-2px);
+}
+.horse-card:disabled { opacity: .4; cursor: not-allowed; }
+.horse-card-selected {
+    background: rgba(0,230,118,.13) !important;
+    border-color: #00e676 !important;
+    box-shadow: 0 0 18px rgba(0,230,118,.25);
+}
+
+.lane-pip {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .6rem;
+    font-weight: 800;
+    color: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,.4);
+}
+
+.hc-emoji { font-size: 2rem; }
+.hc-name  { font-size: .78rem; font-weight: 700; text-align: center; }
+.hc-odds  { font-size: .75rem; color: #ffd700; font-weight: 700; }
+
+/* ── Chip selector ──────────────────────────────────────────────── */
+.chip-row {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
+
+.chip-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 3px solid;
+    font-family: 'Russo One', sans-serif;
+    font-size: .75rem;
+    cursor: pointer;
+    transition: all .22s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.chip-btn:hover:not(:disabled) { transform: scale(1.15); box-shadow: 0 0 14px currentColor; }
+.chip-btn:disabled { opacity: .4; cursor: not-allowed; }
+.chip-selected { transform: scale(1.2) !important; box-shadow: 0 0 22px currentColor !important; }
+
+.chip-blue   { background: linear-gradient(135deg,#3b82f6,#1d4ed8); border-color:#3b82f6; color:#fff; }
+.chip-red    { background: linear-gradient(135deg,#ff2e63,#cc0033); border-color:#ff2e63; color:#fff; }
+.chip-purple { background: linear-gradient(135deg,#a855f7,#7e22ce); border-color:#a855f7; color:#fff; }
+.chip-gold   { background: linear-gradient(135deg,#ffd700,#ffaa00); border-color:#ffd700; color:#0a0a0a; }
+.chip-black  { background: linear-gradient(135deg,#374151,#1f2937); border-color:#6b7280; color:#fff; }
+
+/* ── Start button ───────────────────────────────────────────────── */
+.start-btn {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, #00e676, #ffd700);
+    border: none;
+    border-radius: 10px;
+    color: #040d04;
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    cursor: pointer;
+    transition: all .3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .6rem;
+    box-shadow: 0 6px 24px rgba(0,230,118,.3);
+}
+.start-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 32px rgba(0,230,118,.5); }
+.start-btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.start-btn-active { animation: btnPulse .8s ease-in-out infinite; }
+@keyframes btnPulse {
+    0%,100% { box-shadow: 0 6px 24px rgba(0,230,118,.3); }
+    50%      { box-shadow: 0 6px 36px rgba(0,230,118,.7); }
+}
+
+.spinner-ring {
+    width: 18px;
+    height: 18px;
+    border: 3px solid rgba(4,13,4,.3);
+    border-top-color: #040d04;
+    border-radius: 50%;
+    animation: spin .65s linear infinite;
+    flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Status msg ─────────────────────────────────────────────────── */
+.status-msg {
+    padding: .75rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: .9rem;
+    text-align: center;
+    animation: msgPop .35s cubic-bezier(.175,.885,.32,1.275);
+}
+@keyframes msgPop {
+    from { opacity: 0; transform: scale(.85); }
+    to   { opacity: 1; transform: scale(1); }
+}
+.msg-win  { background: rgba(0,230,118,.1); border: 1px solid rgba(0,230,118,.4); color: #00e676; }
+.msg-loss { background: rgba(255,46,99,.08); border: 1px solid rgba(255,46,99,.3); color: #ff2e63; }
+
+/* ── History ────────────────────────────────────────────────────── */
+.panel-history { gap: .5rem; }
+
+.hist-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .45rem .7rem;
+    border-radius: 7px;
+    font-size: .85rem;
+    animation: pipIn .3s ease-out;
+}
+@keyframes pipIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+.hist-win  { background: rgba(0,230,118,.07); border: 1px solid rgba(0,230,118,.2); }
+.hist-loss { background: rgba(255,46,99,.05);  border: 1px solid rgba(255,46,99,.15); }
+.hist-chip { font-family: 'Russo One', sans-serif; font-size: .8rem; }
+.hist-win  .hist-chip { color: #00e676; }
+.hist-loss .hist-chip { color: #ff2e63; }

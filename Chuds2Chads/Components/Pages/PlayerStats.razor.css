@@ -1,0 +1,299 @@
+.player-stats-page {
+    position: relative;
+    min-height: 100vh;
+    padding: 2rem 1.25rem 3rem;
+    overflow: hidden;
+    background: linear-gradient(135deg, #0a0118 0%, #1a0933 100%);
+    color: #ffffff;
+    font-family: 'Outfit', sans-serif;
+}
+
+.stats-bg-grid {
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(0, 255, 65, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 65, 0.02) 1px, transparent 1px);
+    background-size: 50px 50px;
+    animation: statsGridPan 30s linear infinite;
+    pointer-events: none;
+}
+
+.stats-bg-glow {
+    position: fixed;
+    width: 560px;
+    height: 560px;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.16;
+    pointer-events: none;
+    animation: statsGlowFloat 20s ease-in-out infinite;
+}
+
+.stats-bg-glow-1 {
+    top: -12%;
+    left: -10%;
+    background: radial-gradient(circle, #00ff41, transparent);
+}
+
+.stats-bg-glow-2 {
+    right: -10%;
+    bottom: -14%;
+    background: radial-gradient(circle, #ffd700, transparent);
+    animation-delay: 10s;
+}
+
+@keyframes statsGridPan {
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(50px, 50px); }
+}
+
+@keyframes statsGlowFloat {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(32px, -28px) scale(1.08); }
+}
+
+.stats-wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 1380px;
+    margin: 0 auto;
+}
+
+.stats-back-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-bottom: 1rem;
+    padding: 0.7rem 1.15rem;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 255, 65, 0.28);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.82);
+    text-decoration: none;
+    font-weight: 700;
+    transition: transform 0.2s ease, border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.stats-back-button:hover {
+    transform: translateY(-1px);
+    color: #00ff41;
+    border-color: rgba(0, 255, 65, 0.48);
+    background: rgba(0, 255, 65, 0.08);
+}
+
+.stats-header-card,
+.breakdown-card,
+.stats-message-card,
+.stat-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+    backdrop-filter: blur(14px);
+}
+
+.stats-header-card {
+    border-radius: 22px;
+    padding: 1.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.stats-title {
+    margin: 0;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2.6rem, 5vw, 4rem);
+    letter-spacing: 0.08rem;
+    line-height: 1.02;
+}
+
+.stats-subtitle {
+    margin: 0.6rem 0 0;
+    color: rgba(255, 255, 255, 0.64);
+    font-size: 1rem;
+}
+
+.stats-overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.2rem;
+    margin-bottom: 1.5rem;
+}
+
+.stat-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 20px;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.stat-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--card-accent, #00ff41), transparent);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(255, 215, 0, 0.3);
+    box-shadow: 0 22px 52px rgba(0, 0, 0, 0.34);
+}
+
+.stat-card:hover::before {
+    opacity: 1;
+}
+
+.stat-card.featured {
+    --card-accent: #00ff41;
+    background:
+        linear-gradient(135deg, rgba(0, 255, 65, 0.1), rgba(255, 215, 0, 0.06)),
+        rgba(255, 255, 255, 0.03);
+}
+
+.stat-card.money {
+    --card-accent: #ffd700;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.52);
+    font-weight: 700;
+}
+
+.stat-value {
+    font-family: 'Russo One', sans-serif;
+    font-size: 1.45rem;
+    line-height: 1.15;
+    color: #ffffff;
+    word-break: break-word;
+}
+
+.positive {
+    color: #00ff41;
+}
+
+.negative {
+    color: #ff5f86;
+}
+
+.breakdown-card {
+    border-radius: 24px;
+    padding: 1.35rem;
+}
+
+.breakdown-header {
+    margin-bottom: 1rem;
+}
+
+.breakdown-header h2 {
+    margin: 0;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    letter-spacing: 0.06rem;
+}
+
+.breakdown-header p {
+    margin: 0.35rem 0 0;
+    color: rgba(255, 255, 255, 0.62);
+}
+
+.table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    border-radius: 18px;
+}
+
+.stats-table {
+    width: 100%;
+    min-width: 980px;
+    border-collapse: collapse;
+    overflow: hidden;
+    border-radius: 18px;
+}
+
+.stats-table thead th {
+    padding: 1rem 0.95rem;
+    text-align: left;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #fef3c7;
+    background: linear-gradient(180deg, rgba(255, 215, 0, 0.18), rgba(0, 255, 65, 0.08));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stats-table tbody td {
+    padding: 0.95rem;
+    color: rgba(255, 255, 255, 0.88);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.stats-table tbody tr:nth-child(even) td {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.stats-table tbody tr:hover td {
+    background: rgba(0, 255, 65, 0.07);
+}
+
+.game-name {
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.stats-message-card {
+    border-radius: 20px;
+    padding: 1rem 1.15rem;
+    margin-top: 1rem;
+}
+
+.stats-message-card.compact {
+    margin-top: 0;
+}
+
+.stats-message-card.error {
+    border-color: rgba(255, 95, 134, 0.38);
+    background: rgba(92, 14, 38, 0.64);
+}
+
+.stats-loading {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+@media (max-width: 768px) {
+    .player-stats-page {
+        padding: 1.1rem 0.8rem 2rem;
+    }
+
+    .stats-header-card,
+    .breakdown-card,
+    .stats-message-card,
+    .stat-card {
+        border-radius: 18px;
+    }
+
+    .stats-title {
+        font-size: 2.4rem;
+    }
+
+    .stat-value {
+        font-size: 1.25rem;
+    }
+
+    .breakdown-card {
+        padding: 1rem;
+    }
+}

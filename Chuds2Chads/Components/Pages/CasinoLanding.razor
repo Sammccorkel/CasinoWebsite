@@ -1,0 +1,446 @@
+@page "/"
+@rendermode InteractiveServer
+@using System.Timers
+@using Microsoft.EntityFrameworkCore.Metadata.Internal
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+
+<PageTitle>Chuds to Chads Casino - Transform Your Fortune</PageTitle>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 20px; border-radius: 8px; z-index: 9999; max-width: 400px;">
+        <strong>Error:</strong> @errorMessage
+        <button @onclick="() => errorMessage = null" style="margin-left: 10px; background: white; color: #ef4444; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">✕</button>
+    </div>
+}
+
+<div class="casino-container">
+    <div class="floating-elements">
+        <div class="floating-card">🂡</div>
+        <div class="floating-card">🃁</div>
+        <div class="floating-chip">⬤</div>
+        <div class="floating-chip">⬤</div>
+    </div>
+
+    <header class="header">
+        <NavLink href="/" class="logo-link">
+                <img src="/images/C2C-Logo-Transparent.png" alt="C2C Casino" class="logo-image" />
+        </NavLink>
+        <div class="nav-buttons">
+            <AuthorizeView>
+                <Authorized>
+                    <span class="username-display">Welcome, @context.User.Identity?.Name!</span>
+                    <button class="btn btn-profile" @onclick="HandleProfile">Profile</button>
+                    <button class="btn btn-secondary" @onclick="HandleLogout">Logout</button>
+                </Authorized>
+                <NotAuthorized>
+                    <button class="btn btn-secondary" @onclick="HandleLogin">Login</button>
+                    <button class="btn btn-primary" @onclick="HandleSignUp">Sign Up</button>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div class="transformation-badge">
+            <svg class="sparkle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
+            </svg>
+            Transform Your Fortune
+        </div>
+        
+        <h1 class="hero-title">
+            <span class="from">From Chuds</span>
+            <span class="arrow">→</span>
+            <span class="to">To Chads</span>
+        </h1>
+        
+        <p class="hero-subtitle">
+            Level up your game at the most electrifying online casino. Play multiplayer blackjack, 
+            poker, and more. No risk, pure thrill, all skill.
+        </p>
+        
+        <div class="hero-cta">
+            <button class="btn btn-primary btn-hero" @onclick="HandleStartPlaying">Start Playing Free</button>
+            <button class="btn btn-secondary btn-hero" @onclick="HandleViewGames">View Games</button>
+        </div>
+
+        <div class="chip-display">
+            <div class="chip chip-green @(currentChipIndex == 0 ? "active" : "")">
+                <span>$100</span>
+                <small>STARTER</small>
+            </div>
+            <div class="chip chip-gold @(currentChipIndex == 1 ? "active" : "")">
+                <span>$500</span>
+                <small>PRO</small>
+            </div>
+            <div class="chip chip-red @(currentChipIndex == 2 ? "active" : "")">
+                <span>$1000</span>
+                <small>CHAD</small>
+            </div>
+        </div>
+    </section>
+
+    <section class="features">
+        <div class="features-header">
+            <h2 class="section-title">Why Go Chad?</h2>
+            <p class="section-subtitle">Experience the ultimate in online gaming</p>
+        </div>
+        
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="32" height="32">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                    </svg>
+                </div>
+                <h3 class="feature-title">Multiplayer Action</h3>
+                <p class="feature-description">
+                    Face off against real players in live blackjack and poker rooms. Build your reputation 
+                    and climb the leaderboards.
+                </p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="32" height="32">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+                <h3 class="feature-title">Instant Play</h3>
+                <p class="feature-description">
+                    No downloads, no waiting. Jump straight into the action with our lightning-fast 
+                    platform built for speed.
+                </p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="32" height="32">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                    </svg>
+                </div>
+                <h3 class="feature-title">Level Up System</h3>
+                <p class="feature-description">
+                    Start as a Chud, earn your way to Chad status. Unlock exclusive games, avatars, 
+                    and bragging rights.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <section class="games" id="games-section">
+        <div class="features-header">
+            <h2 class="section-title">Choose Your Game</h2>
+            <p class="section-subtitle">Master the classics or try something new</p>
+        </div>
+        
+        <div class="games-grid">
+            <div class="game-card" @onclick="HandleBlackjackClick">
+                <div class="game-image">
+                    <span>🂡</span>
+                </div>
+                <div class="game-content">
+                    <h3 class="game-title">Blackjack</h3>
+                    <p class="game-description">
+                        Classic 21. Beat the dealer in this timeless card game with perfect odds and pure strategy.
+                    </p>
+                    <div class="game-stats">
+                        <div class="stat">
+                            <span class="stat-value">247</span>
+                            <span class="stat-label">Online</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">2-6</span>
+                            <span class="stat-label">Players</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">Fast</span>
+                            <span class="stat-label">Pace</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="game-card" @onclick="HandlePokerClick">
+                <div class="game-image game-image-poker">
+                    <span>🃏</span>
+                </div>
+                <div class="game-content">
+                    <h3 class="game-title">Texas Hold'em</h3>
+                    <p class="game-description">
+                        The ultimate poker showdown. Read your opponents, bluff big, and take down the pot.
+                    </p>
+                    <div class="game-stats">
+                        <div class="stat">
+                            <span class="stat-value">183</span>
+                            <span class="stat-label">Online</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">2-9</span>
+                            <span class="stat-label">Players</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">Strategic</span>
+                            <span class="stat-label">Pace</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            @* Roulette -- uses .game-image-roulette from CasinoLanding.razor.css *@
+            <div class="game-card" @onclick="HandleRouletteClick">
+                <div class="game-image game-image-roulette">
+                    <span>🎡</span>
+                </div>
+                <div class="game-content">
+                    <h3 class="game-title">Roulette</h3>
+                    <p class="game-description">
+                        Spin the wheel and chase the number. Red, black, or lucky 0 — every spin is a rush.
+                    </p>
+                    <div class="game-stats">
+                        <div class="stat">
+                            <span class="stat-value">1</span>
+                            <span class="stat-label">Player</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">35:1</span>
+                            <span class="stat-label">Max Pay</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">Fast</span>
+                            <span class="stat-label">Pace</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* Slots -- uses .game-image-slots from CasinoLanding.razor.css *@
+            <div class="game-card" @onclick= "HandleSlotsClick">
+                <div class="game-image game-image-slots">
+                    <span>🎰</span>
+                </div>
+                <div class="game-content">
+                    <h3 class="game-title">Slots</h3>
+                    <p class="game-description">
+                        Three reels, one payline, and a jackpot waiting for you. Match the sevens and clean up.
+                    </p>
+                    <div class="game-stats">
+                        <div class="stat">
+                            <span class="stat-value">1</span>
+                            <span class="stat-label">Player</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">50×</span>
+                            <span class="stat-label">Jackpot</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">Instant</span>
+                            <span class="stat-label">Pace</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* Horse Race -- uses .game-image-horse from CasinoLanding.razor.css *@
+            <div class="game-card" @onclick="HandleHorseClick">
+                <div class="game-image game-image-horse">
+                    <span>🏇</span>
+                </div>
+                <div class="game-content">
+                    <h3 class="game-title">Horse Race</h3>
+                    <p class="game-description">
+                        Four horses, one random winner. Back your horse, watch the race, and collect your winnings. 
+                    </p>
+                    <div class="game-stats">
+                        <div class="stat">
+                            <span class="stat-value">1</span>
+                            <span class="stat-label">Player</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">7:1</span>
+                            <span class="stat-label">Best Odds</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">Quick</span>
+                            <span class="stat-label">Pace</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="final-cta">
+        <div class="final-cta-content">
+            <h2>Ready to Make the Transformation?</h2>
+            <p>Join thousands of players leveling up their game. Start with free chips and play your way to the top.</p>
+            <button class="btn btn-primary btn-hero" @onclick="HandleSignUp">Create Your Account</button>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <p class="footer-text">
+                <strong>Chuds to Chads Casino</strong> - Where Chuds become Chads
+            </p>
+            <p class="footer-disclaimer">
+                This is a school project for educational purposes only. No real money transactions occur. 
+                All currency is virtual and for entertainment only. Must be 18+ to play.
+            </p>
+        </div>
+    </footer>
+</div>
+
+@code {
+    [Inject] private AuthenticationStateProvider AuthStateProvider { get; set; } = default!;
+    private int currentChipIndex = 0;
+    private Timer? chipRotationTimer;
+    private string? errorMessage;
+
+    private sealed class ApiResult
+    {
+        public bool Ok { get; set; }
+        public int Status { get; set; }
+        public string? Text { get; set; }
+    }
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            // Initialize chip rotation timer
+            chipRotationTimer = new Timer(3000); // 3 seconds
+            chipRotationTimer.Elapsed += RotateChips;
+            chipRotationTimer.AutoReset = true;
+            chipRotationTimer.Start();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Initialization error: {ex.Message}";
+            Console.WriteLine($"Error in OnInitialized: {ex}");
+        }
+    }
+
+    private void RotateChips(object? sender, ElapsedEventArgs e)
+    {
+        currentChipIndex = (currentChipIndex + 1) % 3;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleHorseClick()
+    {
+        Navigation.NavigateTo("/HorseRacing/horserace");
+    }
+
+    private void HandleRouletteClick()
+    {
+        Navigation.NavigateTo("/roulette/roulette");
+    }
+    private void HandleSlotsClick()
+    {
+        Navigation.NavigateTo("/slots/slots");
+    }
+
+    private void HandlePokerClick() => Navigation.NavigateTo("/PokerLobby");
+
+    private void HandleBlackjackClick() => Navigation.NavigateTo("/BlackjackLobby");
+
+    private async Task HandleViewGames()
+    {
+        await JS.InvokeVoidAsync("eval", "document.getElementById('games-section').scrollIntoView({behavior:'smooth'})");
+    }
+
+    private async Task HandleStartPlaying()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            await JS.InvokeVoidAsync("eval", "document.getElementById('games-section').scrollIntoView({behavior:'smooth'})");
+        }
+        else
+        {
+            Navigation.NavigateTo("/register");
+        }
+    }
+    private void HandleLogin()
+    {
+        try
+        {
+            Console.WriteLine("HandleLogin called - navigating to /login");
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Login navigation error: {ex.Message}";
+            Console.WriteLine($"Error in HandleLogin: {ex}");
+        }
+    }
+
+    private void HandleSignUp()
+    {
+        try
+        {
+            Console.WriteLine("HandleSignUp called - navigating to /register");
+            Navigation.NavigateTo("/register");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Sign up navigation error: {ex.Message}";
+            Console.WriteLine($"Error in HandleSignUp: {ex}");
+        }
+    }
+
+    private void HandleProfile()
+    {
+        try
+        {
+            Console.WriteLine("HandleProfile called - navigating to /profile");
+            Navigation.NavigateTo("/profile");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Profile navigation error: {ex.Message}";
+            Console.WriteLine($"Error in HandleProfile: {ex}");
+        }
+    }
+
+    private async Task HandleLogout()
+    {
+        try
+        {
+            Console.WriteLine("HandleLogout called");
+            var result = await JS.InvokeAsync<ApiResult>("auth.logout");
+            if (result.Ok)
+            {
+                Navigation.NavigateTo("/", forceLoad: true);
+            }
+            else
+            {
+                errorMessage = !string.IsNullOrEmpty(result.Text)
+                    ? $"Logout failed: {result.Text}"
+                    : $"Logout failed with status {result.Status}.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Logout error: {ex.Message}";
+            Console.WriteLine($"Error in HandleLogout: {ex}");
+        }
+    }
+
+    private void HandleCreateAccount()
+    {
+        // TODO: Navigate to registration page or show sign up modal - Nav.NavigateTo("/register") once registration page exists
+        Console.WriteLine("Create Account clicked");
+    }
+
+    public void Dispose()
+    {
+        chipRotationTimer?.Stop();
+        chipRotationTimer?.Dispose();
+    }
+}

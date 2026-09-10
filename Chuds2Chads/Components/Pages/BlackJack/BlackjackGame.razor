@@ -1,0 +1,269 @@
+@page "/blackjack-game/{RoomId:guid}"
+@rendermode InteractiveServer
+@using System.Security.Claims
+@inject AuthenticationStateProvider AuthStateProvider
+@inject MultiplayerService MultiplayerService
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<div class="casino-table">
+    <button class="btn-leave" @onclick="LeaveTableAsync">&#8592; Leave Table</button>
+
+    @if (table is null)
+    {
+        <h2 style="text-align:center; margin-top:20vh;">Loading Table...</h2>
+    }
+    else
+    {
+        <div style="display:flex; justify-content:space-between; align-items:center; color:white; padding: 1rem 2rem;">
+            <div>
+                <strong>@table.RoomName</strong><br />
+                <span>Code: @table.RoomCode • Min Bet: @table.MinBet</span>
+            </div>
+            <div>
+                Wallet: @table.Balance chips
+            </div>
+        </div>
+
+        @if (table.IsClosing)
+        {
+            <div style="margin: 0 2rem 1rem; padding: 0.85rem 1rem; border-radius: 14px; color: white; background: rgba(245, 158, 11, 0.18); border: 1px solid rgba(245, 158, 11, 0.35);">
+                This table has been marked for deletion and will close after the current round ends.
+            </div>
+        }
+
+        <div style="display:flex; gap:1.5rem; align-items:flex-start; padding: 0 1.5rem 1.5rem;">
+            @if (ShowRoundPanel)
+            {
+                <aside style="width: 320px; flex-shrink: 0; background: rgba(5,18,12,0.92); border: 1px solid rgba(255,215,0,0.2); border-radius: 18px; color: white; padding: 1.25rem; box-shadow: 0 20px 45px rgba(0,0,0,0.28);">
+                    <h2 style="color:#ffd700; margin:0 0 0.75rem 0;">@(table.Game.Phase == GamePhase.GameOver ? "Round Complete" : table.IsPrivate ? "Place Your Bet" : "Waiting For Bets")</h2>
+
+                    @if (table.Game.Phase == GamePhase.GameOver && roundResults.Count > 0)
+                    {
+                        @if (table.IsPrivate && currentPlayerResult is not null)
+                        {
+                            <div style="background: rgba(255,255,255,0.05); border-radius: 14px; padding: 0.9rem; margin-bottom: 1rem;">
+                                <div style="font-weight: 700; color: #ffd700;">@currentPlayerResult.ResultLabel</div>
+                                <div style="margin-top: 0.35rem;">@GetRoundMessage(currentPlayerResult)</div>
+                                <div style="margin-top: 0.65rem; color:#d7d7d7;">Player Score: @currentPlayerResult.PlayerScore</div>
+                                <div style="color:#d7d7d7;">Dealer Score: @currentPlayerResult.DealerScore</div>
+                            </div>
+                        }
+                        else
+                        {
+                            <table class="table" style="color: white; margin-top: 0.25rem;">
+                                <thead>
+                                    <tr>
+                                        <th>Player</th>
+                                        <th>Result</th>
+                                        <th>Net</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var result in roundResults)
+                                    {
+                                        <tr>
+                                            <td>@result.PlayerName</td>
+                                            <td>@result.ResultLabel (@result.PlayerScore-@result.DealerScore)</td>
+                                            <td>@FormatDelta(result.NetChips)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    }
+                    else
+                    {
+                        <p style="margin-top: 0; color:#d7d7d7;">@(table.IsPrivate ? "Place a bet to jump straight into your private blackjack table." : "Each player must place a bet before the next round starts.")</p>
+                    }
+
+                    <div style="display:flex; gap:0.75rem; justify-content:center; margin: 1rem 0 0.75rem;">
+                        <input type="number" min="@table.MinBet" step="10" @bind="betAmount" class="raise-input" />
+                        <button class="btn-action btn-hit" @onclick="PlaceBetAsync">Place Bet</button>
+                    </div>
+
+                    <table class="table" style="color: white; margin-top: 0.75rem;">
+                        <thead>
+                            <tr>
+                                <th>Player</th>
+                                <th>Round Bet</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var player in table.Game.Players)
+                            {
+                                <tr>
+                                    <td>@player.Name</td>
+                                    <td>@(table.PendingBets.TryGetValue(player.UserId, out var bet) ? bet : 0)</td>
+                                    <td>@(player.IsDisconnected ? "Disconnected" : table.PendingBets.ContainsKey(player.UserId) ? "Ready" : "Waiting")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </aside>
+            }
+
+            <div style="flex:1; min-width:0;">
+                <div class="deck-area @(table.Game.Phase == GamePhase.Dealing || !table.Game.Players.Any(p => p.Hand.Any()) ? "anim-shuffle" : "")">
+                    <img src="@Card.CardBackPath" class="deck-image" />
+                </div>
+
+                <div class="dealer-zone">
+                    <div class="cards-container">
+                        @foreach (var cardData in table.Game.Dealer.Hand.Select((value, index) => new { value, index }))
+                        {
+                            <div style="--card-index: @cardData.index;">
+                                @if (cardData.index == 1)
+                                {
+                                    <div class="flip-container anim-deal">
+                                        <div class="flipper @(table.Game.DealerRevealed ? "is-flipped" : "")">
+                                            <img src="@Card.CardBackPath" class="card-back" />
+                                            <img src="@cardData.value.ImagePath" class="card-front" />
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <img src="@cardData.value.ImagePath" class="playing-card anim-deal" style="margin-left: @(cardData.index == 0 ? "0" : "-60px");" />
+                                }
+                            </div>
+                        }
+                    </div>
+                    <div class="player-nameplate">
+                        DEALER <br />
+                        <span style="color:#ffd700">@(table.Game.DealerRevealed ? table.Game.Dealer.Score.ToString() : "?")</span>
+                    </div>
+                </div>
+
+                <div class="players-zone">
+                    @foreach (var player in table.Game.Players)
+                    {
+                        <div class="player-spot @(table.Game.CurrentPlayer?.UserId == player.UserId ? "active-turn" : "")">
+                            <div class="cards-container">
+                                @foreach (var cardData in player.Hand.Select((value, index) => new { value, index }))
+                                {
+                                    <img src="@cardData.value.ImagePath"
+                                         class="playing-card anim-deal card-zoom"
+                                         style="--card-index: @(cardData.index + 2); margin-left: @(cardData.index == 0 ? "0" : "-60px");" />
+                                }
+                            </div>
+
+                            @if (table.Game.Phase == GamePhase.PlayerTurn && table.Game.CurrentPlayer?.UserId == player.UserId && player.UserId == currentUserId)
+                            {
+                                <div class="action-buttons">
+                                    <button class="btn-action btn-hit" @onclick="HitAsync">HIT</button>
+                                    <button class="btn-action btn-stand" @onclick="StandAsync">STAND</button>
+                                </div>
+                            }
+
+                            <div class="player-nameplate">
+                                @player.Name <br />
+                                <span style="color:#ffd700">Score: @player.Score • Bet: @(table.PendingBets.TryGetValue(player.UserId, out var currentBet) ? currentBet : 0)</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid RoomId { get; set; }
+
+    private BlackjackTableViewModel? table;
+    private Guid currentUserId;
+    private long betAmount = 100;
+    private PeriodicTimer? refreshTimer;
+    private CancellationTokenSource? refreshCts;
+    private List<BlackjackRoundResultViewModel> roundResults = new();
+    private BlackjackRoundResultViewModel? currentPlayerResult;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        Guid.TryParse(authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out currentUserId);
+        await RefreshAsync();
+
+        refreshCts = new CancellationTokenSource();
+        refreshTimer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+        _ = RunRefreshAsync(refreshCts.Token);
+    }
+
+    private async Task RunRefreshAsync(CancellationToken token)
+    {
+        while (!token.IsCancellationRequested && refreshTimer is not null && await refreshTimer.WaitForNextTickAsync(token))
+        {
+            await RefreshAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        table = await MultiplayerService.GetBlackjackTableAsync(currentUserId, RoomId);
+        if (table is null)
+        {
+            Navigation.NavigateTo("/Dashboard");
+        }
+        else
+        {
+            betAmount = Math.Max(table.MinBet, betAmount);
+            roundResults = table.LastRoundResults;
+            currentPlayerResult = roundResults.FirstOrDefault(result => result.UserId == currentUserId);
+        }
+    }
+
+    private async Task PlaceBetAsync()
+    {
+        if (table is null)
+        {
+            return;
+        }
+
+        await MultiplayerService.PlaceBlackjackBetAsync(currentUserId, RoomId, Math.Max(table.MinBet, betAmount));
+        await RefreshAsync();
+    }
+
+    private async Task HitAsync()
+    {
+        await MultiplayerService.PlayerHitAsync(currentUserId, RoomId);
+        await RefreshAsync();
+    }
+
+    private async Task StandAsync()
+    {
+        await MultiplayerService.PlayerStandAsync(currentUserId, RoomId);
+        await RefreshAsync();
+    }
+
+    private async Task LeaveTableAsync()
+    {
+        await MultiplayerService.LeaveRoomAsync(currentUserId, RoomId);
+        Navigation.NavigateTo("/Dashboard");
+    }
+
+    private bool ShowRoundPanel => table is not null &&
+        (table.Game.Phase == GamePhase.WaitingForPlayers || table.Game.Phase == GamePhase.GameOver);
+
+    private static string FormatDelta(long amount) => amount > 0 ? $"+{amount}" : amount < 0 ? amount.ToString() : "0";
+
+    private string GetRoundMessage(BlackjackRoundResultViewModel result)
+    {
+        return result.ResultLabel switch
+        {
+            "Won" => $"You won {result.NetChips} chips on a bet of {result.Bet}.",
+            "Push" => $"Push. Your {result.Bet} chip bet was returned.",
+            _ => $"You lost {Math.Abs(result.NetChips)} chips on a bet of {result.Bet}."
+        };
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        refreshCts?.Cancel();
+        refreshTimer?.Dispose();
+        refreshCts?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

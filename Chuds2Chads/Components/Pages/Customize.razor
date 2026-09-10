@@ -1,0 +1,580 @@
+@page "/customize"
+@using System.Security.Claims
+@using Chuds2Chads.Data.Entities
+@using Chuds2Chads.Services
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Authorization
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject AvatarService AvatarService
+@attribute [Authorize]
+
+<PageTitle>Customize Character - Chuds to Chads Casino</PageTitle>
+
+<div class="customize-page">
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+
+    <div class="customize-container">
+        <div class="customize-header">
+            <NavLink href="/profile" class="back-link">← Back to Profile</NavLink>
+            <h1>Character Customization</h1>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="alert alert-loading">Loading customization inventory...</div>
+        }
+        else
+        {
+            @if (!string.IsNullOrWhiteSpace(message))
+            {
+                <div class="alert @(hasErrorMessage ? "alert-error" : "alert-success")">@message</div>
+            }
+
+            <div class="avatar-preview-card">
+                <h2>Current Loadout</h2>
+                <div class="preview-grid">
+                    @foreach (var slot in OrderedSlots)
+                    {
+                        <div class="preview-item">
+                            <span class="preview-label">@slot</span>
+                            <img class="preview-image" src="@GetEquippedImagePath(slot)" alt="@($"{slot} cosmetic")" />
+                            <span class="preview-value">@GetEquippedLabel(slot)</span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="inventory-grid">
+                @foreach (var slot in OrderedSlots)
+                {
+                    <section class="slot-panel">
+                        <div class="slot-header">
+                            <h3>@slot</h3>
+                            <span class="slot-count">@GetCount(slot) owned</span>
+                        </div>
+
+                        @if (inventoryBySlot.TryGetValue(slot, out var items) && items.Count > 0)
+                        {
+                            @foreach (var item in items)
+                            {
+                                <article class="cosmetic-item @(item.IsEquipped ? "equipped" : "")">
+                                    <img class="cosmetic-image" src="@item.ImagePath" alt="@item.Name" />
+                                    <div class="cosmetic-top-row">
+                                        <strong>@item.Name</strong>
+                                        <span class="rarity">@item.Rarity</span>
+                                    </div>
+                                    <div class="meta">Asset: @item.AssetKey</div>
+                                    <div class="meta">Object ID: @item.ObjectId</div>
+                                    <div class="meta">Earned: @item.EarnedUtc.ToLocalTime().ToString("g")</div>
+                                    @if (item.IsEquipped)
+                                    {
+                                        <button class="equip-button equip-button--equipped" disabled>Equipped</button>
+                                        <button class="unequip-button" @onclick="() => UnequipAsync(item.Slot)">Unequip</button>
+                                    }
+                                    else
+                                    {
+                                        <button class="equip-button" @onclick="() => EquipAsync(item.ObjectId)">Equip</button>
+                                    }
+                                </article>
+                            }
+                        }
+                        else
+                        {
+                            <div class="empty-slot">No items in this slot yet.</div>
+                        }
+                    </section>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+.customize-page {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0a0118 0%, #1a0933 100%);
+    color: white;
+    font-family: 'Outfit', sans-serif;
+    position: relative;
+    overflow-x: hidden;
+}
+
+.bg-grid {
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(0, 255, 65, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 65, 0.02) 1px, transparent 1px);
+    background-size: 50px 50px;
+    animation: gridPan 30s linear infinite;
+    pointer-events: none;
+}
+
+@@keyframes gridPan {
+    0%   { transform: translate(0, 0); }
+    100% { transform: translate(50px, 50px); }
+}
+
+.bg-glow {
+    position: fixed;
+    width: 600px;
+    height: 600px;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.15;
+    pointer-events: none;
+    animation: glowFloat 20s ease-in-out infinite;
+}
+
+.bg-glow-1 {
+    background: radial-gradient(circle, #00ff41, transparent);
+    top: -10%;
+    left: -10%;
+}
+
+.bg-glow-2 {
+    background: radial-gradient(circle, #ffd700, transparent);
+    bottom: -10%;
+    right: -10%;
+    animation-delay: 10s;
+}
+
+@@keyframes glowFloat {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%       { transform: translate(30px, -30px) scale(1.1); }
+}
+
+.customize-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 3rem 3%;
+    position: relative;
+    animation: fadeInUp 0.6s ease-out;
+}
+
+@@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.customize-header {
+    margin-bottom: 2.5rem;
+}
+
+.customize-header h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2.5rem, 5vw, 4rem);
+    letter-spacing: 2px;
+    margin: 0.5rem 0 0;
+    background: linear-gradient(135deg, #00ff41, #ffd700);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.back-link {
+    color: #00ff41;
+    text-decoration: none;
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    opacity: 0.8;
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.back-link:hover {
+    opacity: 1;
+    transform: translateX(-4px);
+}
+
+.avatar-preview-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(0, 255, 65, 0.2);
+    border-radius: 20px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.avatar-preview-card h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.6rem;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.85);
+    margin: 0 0 1.25rem;
+}
+
+.preview-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.preview-item {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    transition: border-color 0.3s ease;
+}
+
+.preview-item:hover {
+    border-color: rgba(0, 255, 65, 0.25);
+}
+
+.preview-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.preview-value {
+    font-family: 'Russo One', sans-serif;
+    color: #00ff41;
+    font-size: 0.85rem;
+}
+
+.preview-image {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    min-height: 110px;
+    max-height: 150px;
+    object-fit: contain;
+    border-radius: 8px;
+    padding: 10px;
+    background:
+        linear-gradient(135deg, rgba(10, 1, 24, 0.95), rgba(2, 6, 23, 0.95)),
+        repeating-conic-gradient(from 45deg, rgba(0, 255, 65, 0.05) 0 25%, transparent 0 50%) 50% / 14px 14px;
+    border: 1px solid rgba(0, 255, 65, 0.15);
+}
+
+.inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+}
+
+.slot-panel {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 1.25rem;
+    transition: border-color 0.3s ease;
+}
+
+.slot-panel:hover {
+    border-color: rgba(0, 255, 65, 0.2);
+}
+
+.slot-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(0, 255, 65, 0.1);
+}
+
+.slot-header h3 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.3rem;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.85);
+    margin: 0;
+}
+
+.slot-count {
+    font-size: 0.75rem;
+    color: rgba(255, 215, 0, 0.8);
+    font-family: 'Russo One', sans-serif;
+}
+
+.cosmetic-item {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 0.85rem;
+    margin-bottom: 0.75rem;
+    background: rgba(255, 255, 255, 0.02);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cosmetic-item:hover {
+    border-color: rgba(0, 255, 65, 0.2);
+}
+
+.cosmetic-image {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    min-height: 140px;
+    max-height: 200px;
+    object-fit: contain;
+    padding: 12px;
+    margin-bottom: 0.75rem;
+    border-radius: 8px;
+    background:
+        linear-gradient(135deg, rgba(10, 1, 24, 0.98), rgba(2, 6, 23, 0.98)),
+        repeating-conic-gradient(from 45deg, rgba(0, 255, 65, 0.05) 0 25%, transparent 0 50%) 50% / 16px 16px;
+    border: 1px solid rgba(0, 255, 65, 0.12);
+}
+
+.cosmetic-item.equipped {
+    border-color: rgba(0, 255, 65, 0.6);
+    box-shadow: 0 0 16px rgba(0, 255, 65, 0.12);
+}
+
+.cosmetic-item.equipped .cosmetic-image {
+    border-color: rgba(0, 255, 65, 0.3);
+}
+
+.cosmetic-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.4rem;
+}
+
+.cosmetic-top-row strong {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.9rem;
+}
+
+.rarity {
+    color: #ffd700;
+    font-size: 0.7rem;
+    font-family: 'Russo One', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.meta {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.72rem;
+    margin-bottom: 2px;
+    word-break: break-word;
+}
+
+.equip-button {
+    margin-top: 0.6rem;
+    border: none;
+    border-radius: 8px;
+    padding: 0.55rem 1rem;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    background: linear-gradient(135deg, #00ff41, #ffd700);
+    color: #0a0118;
+    transition: all 0.2s ease;
+}
+
+.equip-button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0, 255, 65, 0.35);
+}
+
+.equip-button--equipped {
+    background: rgba(0, 255, 65, 0.12);
+    color: rgba(0, 255, 65, 0.7);
+    cursor: default;
+    border: 1px solid rgba(0, 255, 65, 0.25);
+}
+
+.unequip-button {
+    margin-top: 0.4rem;
+    margin-left: 0.4rem;
+    border: 1px solid rgba(255, 46, 99, 0.4);
+    border-radius: 8px;
+    padding: 0.55rem 1rem;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    background: transparent;
+    color: #ff2e63;
+    transition: all 0.2s ease;
+}
+
+.unequip-button:hover {
+    background: rgba(255, 46, 99, 0.1);
+    border-color: #ff2e63;
+    transform: translateY(-1px);
+}
+
+.empty-slot {
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 0.85rem;
+    padding: 1rem 0;
+    text-align: center;
+}
+
+.alert {
+    padding: 1rem 1.5rem;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.alert-loading {
+    background: rgba(0, 255, 65, 0.06);
+    color: #00ff41;
+    border: 1px solid rgba(0, 255, 65, 0.3);
+}
+
+.alert-error {
+    background: rgba(255, 46, 99, 0.1);
+    color: #ff2e63;
+    border: 1px solid rgba(255, 46, 99, 0.4);
+}
+
+.alert-success {
+    background: rgba(0, 255, 65, 0.08);
+    color: #9dffbf;
+    border: 1px solid rgba(0, 255, 65, 0.35);
+    margin-bottom: 1rem;
+}
+
+@@media (max-width: 900px) {
+    .inventory-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .preview-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+@code {
+    private static readonly AvatarSlot[] OrderedSlots =
+    [
+        AvatarSlot.Head,
+        AvatarSlot.Face,
+        AvatarSlot.Body,
+        AvatarSlot.Torso,
+        AvatarSlot.Legs,
+        AvatarSlot.Shoe
+    ];
+
+    private bool isLoading = true;
+    private string message = string.Empty;
+    private bool hasErrorMessage;
+    private Guid userId;
+    private Dictionary<AvatarSlot, List<OwnedCosmeticDto>> inventoryBySlot = new();
+    private Dictionary<AvatarSlot, Guid?> equippedBySlot = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userIdValue = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!Guid.TryParse(userIdValue, out userId))
+            {
+                message = "Unable to identify the signed-in user.";
+                hasErrorMessage = true;
+                return;
+            }
+
+            var data = await AvatarService.GetCustomizationDataAsync(userId);
+            if (data is null)
+            {
+                message = "Avatar data is unavailable.";
+                hasErrorMessage = true;
+                return;
+            }
+
+            message = string.Empty;
+            hasErrorMessage = false;
+            equippedBySlot = data.EquippedObjectIds;
+            inventoryBySlot = data.OwnedCosmetics
+                .GroupBy(i => i.Slot)
+                .ToDictionary(g => g.Key, g => g.ToList());
+        }
+        catch (Exception ex)
+        {
+            message = $"Error loading customization: {ex.Message}";
+            hasErrorMessage = true;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private int GetCount(AvatarSlot slot)
+    {
+        return inventoryBySlot.TryGetValue(slot, out var items) ? items.Count : 0;
+    }
+
+    private string GetEquippedLabel(AvatarSlot slot)
+    {
+        if (!equippedBySlot.TryGetValue(slot, out var equippedObjectId) || equippedObjectId is null)
+        {
+            return "None";
+        }
+
+        if (!inventoryBySlot.TryGetValue(slot, out var items))
+        {
+            return "None";
+        }
+
+        var equippedItem = items.FirstOrDefault(i => i.ObjectId == equippedObjectId.Value);
+        return equippedItem?.Name ?? "None";
+    }
+
+    private string GetEquippedImagePath(AvatarSlot slot)
+    {
+        if (!equippedBySlot.TryGetValue(slot, out var equippedObjectId) || equippedObjectId is null)
+        {
+            return "/images/C2C-Logo-Transparent.png";
+        }
+
+        if (!inventoryBySlot.TryGetValue(slot, out var items))
+        {
+            return "/images/C2C-Logo-Transparent.png";
+        }
+
+        var equippedItem = items.FirstOrDefault(i => i.ObjectId == equippedObjectId.Value);
+        return equippedItem?.ImagePath ?? "/images/C2C-Logo-Transparent.png";
+    }
+
+    private async Task EquipAsync(Guid objectId)
+    {
+        var ok = await AvatarService.EquipAsync(userId, objectId);
+        if (!ok)
+        {
+            message = "Failed to equip item.";
+            hasErrorMessage = true;
+            return;
+        }
+        await LoadAsync();
+    }
+
+    private async Task UnequipAsync(AvatarSlot slot)
+    {
+        var ok = await AvatarService.UnequipAsync(userId, slot);
+        if (!ok)
+        {
+            message = "Failed to unequip item.";
+            hasErrorMessage = true;
+            return;
+        }
+        await LoadAsync();
+    }
+}

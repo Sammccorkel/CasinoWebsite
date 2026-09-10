@@ -1,0 +1,24 @@
+.casino-lobby-wrapper.poker-theme {
+    min-height: 100vh;
+    background: radial-gradient(circle at center, #1a2a4a 0%, #0a0f1a 100%); /* Blue Tint */
+    color: white;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    padding: 20px;
+}
+
+.subtitle { color: #aaa; font-size: 0.9rem; margin-bottom: 20px; }
+.btn-back { background: transparent; border: 1px solid #555; color: #fff; padding: 8px 16px; border-radius: 4px; cursor: pointer; position: absolute; top: 20px; left: 20px; }
+.btn-back:hover { background: #333; border-color: #ffd700; }
+.lobby-split-layout { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 80px auto 0 auto; gap: 40px; }
+.panel { background: rgba(0, 0, 0, 0.6); border: 1px solid #334466; border-radius: 12px; padding: 30px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5); }
+.create-section { flex: 1; max-width: 400px; }
+.list-section { flex: 1.5; height: 600px; display: flex; flex-direction: column; }
+.input-group { display: flex; flex-direction: column; gap: 15px; }
+.casino-input { background: #111; border: 1px solid #445577; color: white; padding: 12px; border-radius: 6px; outline: none; }
+.btn-glow.poker-btn { background: linear-gradient(45deg, #003366, #005599); color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; text-transform: uppercase; box-shadow: 0 0 15px rgba(0, 100, 255, 0.2); }
+.btn-glow.poker-btn:hover { box-shadow: 0 0 25px rgba(0, 100, 255, 0.5); transform: translateY(-2px); }
+.table-list { overflow-y: auto; flex-grow: 1; padding-right: 10px; }
+.lobby-card { background: #1a1a2a; border: 1px solid #334; border-radius: 8px; padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+.btn-join.poker-join { background: transparent; border: 1px solid #4da6ff; color: #4da6ff; padding: 8px 20px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+.btn-join.poker-join:hover { background: #4da6ff; color: #000; }
+.error-text { color: #ff4444; margin-top: 10px; }

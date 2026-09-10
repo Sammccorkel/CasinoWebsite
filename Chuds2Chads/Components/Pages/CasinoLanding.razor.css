@@ -1,0 +1,722 @@
+/* Casino Landing Page Styles - Blazor CSS Isolation */
+
+.casino-container {
+    --neon-green: #00ff41;
+    --gold: #ffd700;
+    --deep-purple: #1a0933;
+    --dark-bg: #0a0118;
+    --card-red: #ff2e63;
+    --electric-blue: #00d4ff;
+
+    min-height: 100vh;
+    background: linear-gradient(135deg, var(--dark-bg) 0%, var(--deep-purple) 100%);
+    color: white;
+    font-family: 'Outfit', sans-serif;
+    position: relative;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Animated Background Grid */
+.casino-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: linear-gradient(var(--neon-green) 1px, transparent 1px),
+        linear-gradient(90deg, var(--neon-green) 1px, transparent 1px);
+    background-size: 100px 100px;
+    opacity: 0.03;
+    animation: gridScroll 20s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes gridScroll {
+    0% {
+        transform: translateY(0);
+    }
+
+    100% {
+        transform: translateY(100px);
+    }
+}
+
+/* Floating Casino Elements */
+.floating-elements {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.floating-card,
+.floating-chip {
+    position: absolute;
+    opacity: 0.15;
+    animation: float 15s infinite ease-in-out;
+    font-size: 4rem;
+}
+
+.floating-card:nth-child(1) {
+    top: 10%;
+    left: 10%;
+    animation-delay: 0s;
+}
+
+.floating-card:nth-child(2) {
+    top: 70%;
+    right: 15%;
+    animation-delay: 5s;
+}
+
+.floating-chip:nth-child(3) {
+    top: 30%;
+    right: 20%;
+    animation-delay: 2s;
+    font-size: 3rem;
+}
+
+.floating-chip:nth-child(4) {
+    bottom: 20%;
+    left: 25%;
+    animation-delay: 7s;
+    font-size: 3rem;
+}
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0) rotate(0deg);
+    }
+
+    50% {
+        transform: translateY(-30px) rotate(10deg);
+    }
+}
+
+/* Header */
+.header {
+    position: relative;
+    padding: 1.5rem 5%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(0, 255, 65, 0.1);
+}
+
+.logo-link {
+    display: inline-block;
+    text-decoration: none;
+    transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+.logo-link:hover {
+    transform: scale(1.05);
+    filter: brightness(1.2);
+}
+
+.logo-image {
+    height: 80px;
+    width: auto;
+    display: block;
+    filter: drop-shadow(0 0 20px rgba(0, 255, 65, 0.5));
+    animation: logoGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes logoGlow {
+    from { filter: drop-shadow(0 0 10px rgba(0, 255, 65, 0.3)); }
+    to   { filter: drop-shadow(0 0 30px rgba(0, 255, 65, 0.8)); }
+}
+
+@keyframes glow {
+    from {
+        filter: drop-shadow(0 0 10px rgba(0, 255, 65, 0.3));
+    }
+
+    to {
+        filter: drop-shadow(0 0 25px rgba(0, 255, 65, 0.7));
+    }
+}
+
+.nav-buttons {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.username-display {
+    color: var(--neon-green);
+    font-weight: 600;
+    margin-right: 0.5rem;
+    font-size: 1rem;
+}
+
+.btn {
+    padding: 0.75rem 2rem;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.btn-secondary {
+    background: transparent;
+    color: var(--neon-green);
+    border: 2px solid var(--neon-green);
+}
+
+.btn-secondary:hover {
+    background: var(--neon-green);
+    color: var(--dark-bg);
+    box-shadow: 0 0 30px rgba(0, 255, 65, 0.6);
+    transform: translateY(-2px);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--neon-green), var(--gold));
+    color: var(--dark-bg);
+    font-weight: 700;
+    box-shadow: 0 8px 30px rgba(0, 255, 65, 0.4);
+}
+
+.btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px rgba(0, 255, 65, 0.6);
+}
+.btn-profile {
+    background: rgba(96, 165, 250, 0.2);
+    color: #60a5fa;
+    border: 2px solid rgba(96, 165, 250, 0.5);
+}
+
+.btn-profile:hover {
+    background: rgba(96, 165, 250, 0.3);
+    border-color: rgba(96, 165, 250, 0.8);
+    transform: translateY(-2px);
+}
+/* Hero Section */
+.hero {
+    position: relative;
+    padding: 8rem 5% 6rem;
+    text-align: center;
+    z-index: 10;
+}
+
+.transformation-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.5rem;
+    background: rgba(0, 255, 65, 0.1);
+    border: 1px solid var(--neon-green);
+    border-radius: 50px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 2rem;
+    animation: fadeInUp 0.8s ease-out;
+}
+
+.sparkle-icon {
+    width: 18px;
+    height: 18px;
+    display: inline-block;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.hero-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(3rem, 8vw, 7rem);
+    line-height: 0.95;
+    margin-bottom: 1.5rem;
+    letter-spacing: 3px;
+    animation: fadeInUp 0.8s ease-out 0.2s both;
+}
+
+.hero-title .from {
+    color: var(--card-red);
+    display: block;
+    font-size: 0.7em;
+    opacity: 0.8;
+}
+
+.hero-title .arrow {
+    color: var(--gold);
+    display: inline-block;
+    margin: 0 1rem;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+.hero-title .to {
+    background: linear-gradient(135deg, var(--neon-green), var(--gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: block;
+    filter: drop-shadow(0 0 30px rgba(0, 255, 65, 0.5));
+}
+
+.hero-subtitle {
+    font-size: 1.3rem;
+    color: rgba(255, 255, 255, 0.8);
+    max-width: 600px;
+    margin: 0 auto 3rem;
+    line-height: 1.6;
+    animation: fadeInUp 0.8s ease-out 0.4s both;
+}
+
+.hero-cta {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    animation: fadeInUp 0.8s ease-out 0.6s both;
+}
+
+.btn-hero {
+    padding: 1.2rem 3rem;
+    font-size: 1.2rem;
+}
+
+/* Chip Display */
+.chip-display {
+    margin: 4rem auto;
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+    animation: fadeInUp 0.8s ease-out 0.8s both;
+}
+
+.chip {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Russo One', sans-serif;
+    font-size: 1.5rem;
+    border: 6px solid;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.chip::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    right: -3px;
+    bottom: -3px;
+    border-radius: 50%;
+    background: inherit;
+    filter: blur(20px);
+    opacity: 0.5;
+    z-index: -1;
+}
+
+.chip.active {
+    transform: scale(1.15);
+    box-shadow: 0 0 40px currentColor;
+}
+
+.chip-green {
+    background: linear-gradient(135deg, #00ff41, #00cc33);
+    border-color: #00ff41;
+    color: var(--dark-bg);
+}
+
+.chip-gold {
+    background: linear-gradient(135deg, #ffd700, #ffaa00);
+    border-color: #ffd700;
+    color: var(--dark-bg);
+}
+
+.chip-red {
+    background: linear-gradient(135deg, #ff2e63, #cc0033);
+    border-color: #ff2e63;
+    color: white;
+}
+
+.chip small {
+    font-size: 0.7rem;
+    margin-top: 0.3rem;
+}
+
+/* Features Section */
+.features {
+    padding: 6rem 5%;
+    position: relative;
+    z-index: 10;
+}
+
+.features-header {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2.5rem, 5vw, 4rem);
+    letter-spacing: 2px;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, white, var(--neon-green));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.section-subtitle {
+    font-size: 1.2rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.feature-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(0, 255, 65, 0.2);
+    border-radius: 16px;
+    padding: 2.5rem;
+    transition: all 0.4s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.feature-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--neon-green), var(--gold));
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s ease;
+}
+
+.feature-card:hover {
+    transform: translateY(-10px);
+    border-color: var(--neon-green);
+    background: rgba(0, 255, 65, 0.05);
+    box-shadow: 0 20px 60px rgba(0, 255, 65, 0.2);
+}
+
+.feature-card:hover::before {
+    transform: scaleX(1);
+}
+
+.feature-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--neon-green), var(--gold));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+    color: var(--dark-bg);
+}
+
+.feature-title {
+    font-family: 'Russo One', sans-serif;
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    color: var(--neon-green);
+}
+
+.feature-description {
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.6;
+}
+
+/* Games Section */
+.games {
+    padding: 6rem 5%;
+    background: rgba(0, 0, 0, 0.3);
+    position: relative;
+    z-index: 10;
+}
+
+.games-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 2.5rem;
+    max-width: 1200px;
+    margin: 3rem auto 0;
+}
+
+.game-card {
+    background: linear-gradient(135deg, rgba(26, 9, 51, 0.8), rgba(10, 1, 24, 0.8));
+    border: 2px solid rgba(0, 255, 65, 0.3);
+    border-radius: 20px;
+    overflow: hidden;
+    transition: all 0.4s ease;
+    cursor: pointer;
+}
+
+.game-card:hover {
+    transform: scale(1.05);
+    border-color: var(--neon-green);
+    box-shadow: 0 25px 70px rgba(0, 255, 65, 0.3);
+}
+
+.game-image {
+    height: 200px;
+    background: linear-gradient(135deg, var(--card-red), var(--deep-purple));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 4rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.game-image-poker {
+    background: linear-gradient(135deg, #1a0933, #00d4ff);
+}
+
+.game-image-soon {
+    background: linear-gradient(135deg, #ffd700, #ff2e63);
+}
+
+.game-image::before {
+    content: '♠ ♥ ♦ ♣';
+    position: absolute;
+    font-size: 6rem;
+    opacity: 0.1;
+    animation: rotate 20s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.game-content {
+    padding: 2rem;
+}
+
+.game-title {
+    font-family: 'Russo One', sans-serif;
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+    color: var(--gold);
+}
+
+.game-description {
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+}
+
+.game-stats {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stat {
+    text-align: center;
+}
+
+.stat-value {
+    font-family: 'Russo One', sans-serif;
+    font-size: 1.5rem;
+    color: var(--neon-green);
+    display: block;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Game card image backgrounds */
+
+/* Roulette – deep green + gold */
+.game-image-roulette {
+    background: linear-gradient(135deg, #0d5c2e, #1a7a3a);
+}
+
+/* Slots – red and purple */
+.game-image-slots {
+    background: linear-gradient(135deg, #6a0dad, #ff2e63);
+}
+
+/* Horse Race – sky and turf */
+.game-image-horse {
+    background: linear-gradient(135deg, #1a6a3a, #0a3a6a);
+}
+
+/* CTA Section */
+.final-cta {
+    padding: 8rem 5%;
+    text-align: center;
+    position: relative;
+    z-index: 10;
+}
+
+.final-cta-content {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 4rem;
+    background: rgba(0, 255, 65, 0.05);
+    border: 2px solid var(--neon-green);
+    border-radius: 24px;
+    position: relative;
+    overflow: hidden;
+}
+
+.final-cta-content::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg,
+            transparent,
+            rgba(0, 255, 65, 0.1),
+            transparent);
+    animation: shine 3s infinite;
+    pointer-events: none;
+}
+
+@keyframes shine {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.final-cta h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    margin-bottom: 1rem;
+    letter-spacing: 2px;
+    position: relative;
+}
+
+.final-cta p {
+    font-size: 1.2rem;
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 2.5rem;
+    position: relative;
+}
+
+/* Footer */
+.footer {
+    padding: 3rem 5%;
+    background: rgba(0, 0, 0, 0.5);
+    border-top: 1px solid rgba(0, 255, 65, 0.2);
+    text-align: center;
+    position: relative;
+    z-index: 10;
+}
+
+.footer-content {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.footer-text {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+.footer-disclaimer {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .hero {
+        padding: 5rem 5% 4rem;
+    }
+
+    .hero-title {
+        font-size: 3rem;
+    }
+
+    .chip-display {
+        gap: 1rem;
+    }
+
+    .chip {
+        width: 90px;
+        height: 90px;
+        font-size: 1.2rem;
+    }
+
+    .nav-buttons {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .btn {
+        padding: 0.6rem 1.5rem;
+        font-size: 0.9rem;
+    }
+}

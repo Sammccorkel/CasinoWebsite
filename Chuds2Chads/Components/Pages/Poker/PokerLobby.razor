@@ -1,0 +1,193 @@
+@page "/poker-lobby"
+@page "/PokerLobby"
+@rendermode InteractiveServer
+@using System.Security.Claims
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@inject MultiplayerService MultiplayerService
+@implements IAsyncDisposable
+
+<div class="casino-lobby-wrapper poker-theme">
+    <button class="btn-back" @onclick="ReturnHome">&#8592; Back to Menu</button>
+
+    <div class="lobby-split-layout">
+        <div class="create-section panel">
+            <h2 class="gold-text">Host Texas Hold'em</h2>
+            <p class="subtitle">Same poker lobby flow, now connected to real multiplayer rooms and wallet-backed stacks.</p>
+
+            @if (!isAuthenticated)
+            {
+                <p class="empty-state">View-only mode. Sign in to host or join a poker table.</p>
+                <button class="btn-glow poker-btn" @onclick='() => Navigation.NavigateTo("/login")'>Sign In</button>
+            }
+            else
+            {
+                <div class="input-group" style="margin-bottom: 0.75rem;">
+                    <input @bind="newLobbyName" placeholder="Enter Table Name..." class="casino-input" />
+                </div>
+                <div class="input-group" style="margin-bottom: 0.75rem;">
+                    <select @bind="selectedVisibility" class="casino-input">
+                        <option value="Private">Private</option>
+                        <option value="Public">Public</option>
+                    </select>
+                    <input type="number" @bind="minimumBet" min="10" step="10" class="casino-input" placeholder="Small Blind" />
+                </div>
+                <button class="btn-glow poker-btn" @onclick="CreateLobbyAsync">Host Poker Table</button>
+            }
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <p class="error-text">@errorMessage</p>
+            }
+        </div>
+
+        <div class="list-section panel">
+            <div class="list-header">
+                <h2 class="gold-text">Open Poker Tables</h2>
+            </div>
+
+            <div class="table-list">
+                @if (!lobbies.Any())
+                {
+                    <p class="empty-state">No active poker tables. Time to host one!</p>
+                }
+                else
+                {
+                    @foreach (var lobby in lobbies)
+                    {
+                        <div class="lobby-card">
+                            <div class="lobby-info">
+                                <span class="lobby-name">♦ @lobby.Name ♦</span>
+                                <span class="player-count">Players: @lobby.CurrentPlayers / @lobby.MaxPlayers</span>
+                                <span class="player-count">Visibility: @(lobby.Visibility == RoomVisibility.Private ? "Private" : "Public") • Blind: @lobby.MinBet</span>
+                            </div>
+                            @if (lobby.CurrentPlayers < lobby.MaxPlayers)
+                            {
+                                <button class="btn-join poker-join" @onclick="() => JoinLobbyAsync(lobby.RoomId)" disabled="@(!isAuthenticated)">Join Table</button>
+                            }
+                            else
+                            {
+                                <span style="color:red">Table Full</span>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<RoomSummaryViewModel> lobbies = new();
+    private string newLobbyName = string.Empty;
+    private string selectedVisibility = "Public";
+    private long minimumBet = 20;
+    private string errorMessage = string.Empty;
+    private Guid currentUserId;
+    private bool isAuthenticated;
+    private PeriodicTimer? refreshTimer;
+    private CancellationTokenSource? refreshCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        isAuthenticated = Guid.TryParse(authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out currentUserId);
+        await RefreshLobbiesAsync();
+
+        refreshCts = new CancellationTokenSource();
+        refreshTimer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        _ = RunRefreshLoopAsync(refreshCts.Token);
+    }
+
+    private async Task RunRefreshLoopAsync(CancellationToken token)
+    {
+        if (refreshTimer is null)
+        {
+            return;
+        }
+
+        while (!token.IsCancellationRequested && await refreshTimer.WaitForNextTickAsync(token))
+        {
+            await RefreshLobbiesAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task RefreshLobbiesAsync()
+    {
+        if (!isAuthenticated)
+        {
+            lobbies = new List<RoomSummaryViewModel>();
+            return;
+        }
+
+        var dashboard = await MultiplayerService.GetDashboardAsync(currentUserId);
+        lobbies = dashboard?.JoinableRooms
+            .Where(r => r.Game == GameType.Poker)
+            .OrderBy(r => r.Name)
+            .ToList() ?? new List<RoomSummaryViewModel>();
+    }
+
+    private void ReturnHome() => Navigation.NavigateTo("/");
+
+    private async Task CreateLobbyAsync()
+    {
+        errorMessage = string.Empty;
+        if (!isAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newLobbyName))
+        {
+            errorMessage = "Enter a table name first.";
+            return;
+        }
+
+        var result = await MultiplayerService.CreateRoomAsync(currentUserId, new CreateRoomRequest
+        {
+            Name = newLobbyName.Trim(),
+            Game = GameType.Poker,
+            Visibility = selectedVisibility == "Private" ? RoomVisibility.Private : RoomVisibility.FriendsOnly,
+            MinBet = Math.Max(10, minimumBet)
+        });
+
+        if (!result.Ok || !result.RoomId.HasValue)
+        {
+            errorMessage = result.Message;
+            await RefreshLobbiesAsync();
+            return;
+        }
+
+        Navigation.NavigateTo($"/poker-game/{result.RoomId.Value}");
+    }
+
+    private async Task JoinLobbyAsync(Guid roomId)
+    {
+        if (!isAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        var result = await MultiplayerService.JoinRoomAsync(currentUserId, roomId);
+        if (result.Ok)
+        {
+            Navigation.NavigateTo($"/poker-game/{roomId}");
+        }
+        else
+        {
+            errorMessage = result.Message;
+            await RefreshLobbiesAsync();
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        refreshCts?.Cancel();
+        refreshTimer?.Dispose();
+        refreshCts?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

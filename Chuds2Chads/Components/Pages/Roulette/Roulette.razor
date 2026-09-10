@@ -1,0 +1,345 @@
+@page "/roulette/roulette"
+@rendermode InteractiveServer
+@using System.Globalization
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthStateProvider
+@inject Chuds2Chads.Services.WalletService WalletService
+@inject Chuds2Chads.Services.RouletteService RouletteService
+
+<PageTitle>Roulette - C2C Casino</PageTitle>
+
+<div class="game-page roulette-page">
+    <div class="ambient-glow glow-green"></div>
+    <div class="ambient-glow glow-red"></div>
+
+    <div class="game-header">
+        <a href="/" class="back-link nav-leave-link">&#8592; Back to Casino</a>
+        <h1 class="game-title-header">Roulette <span class="highlight">Table</span></h1>
+        @if (userId != Guid.Empty)
+        {
+            <div class="balance-pill">@balance chips</div>
+        }
+        else
+        {
+            <div class="balance-pill guest">Guest Mode</div>
+        }
+    </div>
+
+    <div class="roulette-stage">
+        <div class="wheel-panel">
+            <div class="wheel-wrapper">
+                <div class="wheel-marker">
+                    <div class="marker-arrow"></div>
+                    <div class="marker-cap"></div>
+                </div>
+                <div class="wheel-outer-ring"></div>
+                <div class="wheel-face @(isSpinning ? "wheel-spinning" : "")"
+                     style="@WheelTransformStyle">
+                    <div class="wheel-surface" style="@($"background:{wheelGradient};")"></div>
+                    <div class="wheel-pocket-ring"></div>
+                    @for (var index = 0; index < wheelSequence.Length; index++)
+                    {
+                        var pocket = wheelSequence[index];
+                        <div class="wheel-pocket-label"
+                             style="@GetPocketLabelStyle(index)">
+                            <span class="pocket-number" style="@GetPocketNumberStyle(index)">@pocket</span>
+                        </div>
+                    }
+                </div>
+
+                <div class="wheel-ball-track">
+                    <div class="wheel-ball @(isSpinning ? "ball-spinning" : "") @(hasResult ? "ball-landed" : "")"
+                         style="@BallTransformStyle"></div>
+                </div>
+
+                <div class="wheel-center">
+                    <div class="wheel-hub"></div>
+                    <div class="wheel-hub-dot"></div>
+                </div>
+            </div>
+
+            @if (hasResult)
+            {
+                <div class="result-display @(lastWon ? "result-win" : "result-neutral") animate-pop">
+                    <div class="result-number">@resultNumber</div>
+                    <div class="result-color">@GetNumberColor(resultNumber)</div>
+                    <div class="result-message">@lastResult</div>
+                </div>
+            }
+        </div>
+
+        <div class="bet-panel">
+            <div class="bet-row bet-row-summary">
+                <div class="bet-card summary-card">
+                    <div class="bet-card-label">Current Bet</div>
+                    <div class="bet-card-value">@selectedChip chips</div>
+                    <div class="bet-card-subtitle">@GetBetSummary()</div>
+                </div>
+
+                @if (history.Count > 0)
+                {
+                    <div class="bet-card history-card">
+                        <div class="bet-card-label">Recent Spins</div>
+                        <div class="history-list">
+                            @foreach (var h in history.TakeLast(10).Reverse())
+                            {
+                                <span class="history-pip history-@h.Color">@h.Number</span>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="bet-row bet-row-horizontal">
+                <div class="bet-card chips-card">
+                    <div class="bet-card-label">Chip Select</div>
+                    <div class="chip-selector">
+                        @foreach (var chip in chipValues)
+                        {
+                            <button class="chip-btn @(selectedChip == chip ? "chip-selected" : "") chip-@GetChipColor(chip)"
+                                    @onclick="() => selectedChip = chip"
+                                    disabled="@isSpinning">@chip</button>
+                        }
+                    </div>
+                </div>
+
+                <div class="bet-card options-card">
+                    <div class="bet-card-label">Color</div>
+                    <div class="bet-type-buttons">
+                        <button class="bet-btn bet-red @(betType == "red" ? "bet-active" : "")"
+                                @onclick='() => SetBet("red")' disabled="@isSpinning">Red <span class="odds-tag">2x</span></button>
+                        <button class="bet-btn bet-black @(betType == "black" ? "bet-active" : "")"
+                                @onclick='() => SetBet("black")' disabled="@isSpinning">Black <span class="odds-tag">2x</span></button>
+                        <button class="bet-btn bet-green @(betType == "green" ? "bet-active" : "")"
+                                @onclick='() => SetBet("green")' disabled="@isSpinning">Zero <span class="odds-tag">35x</span></button>
+                    </div>
+                </div>
+
+                <div class="bet-card options-card">
+                    <div class="bet-card-label">Parity & Range</div>
+                    <div class="bet-type-buttons">
+                        <button class="bet-btn @(betType == "even" ? "bet-active" : "")"
+                                @onclick='() => SetBet("even")' disabled="@isSpinning">Even <span class="odds-tag">2x</span></button>
+                        <button class="bet-btn @(betType == "odd" ? "bet-active" : "")"
+                                @onclick='() => SetBet("odd")' disabled="@isSpinning">Odd <span class="odds-tag">2x</span></button>
+                        <button class="bet-btn @(betType == "low" ? "bet-active" : "")"
+                                @onclick='() => SetBet("low")' disabled="@isSpinning">1-18 <span class="odds-tag">2x</span></button>
+                        <button class="bet-btn @(betType == "high" ? "bet-active" : "")"
+                                @onclick='() => SetBet("high")' disabled="@isSpinning">19-36 <span class="odds-tag">2x</span></button>
+                    </div>
+                </div>
+
+                <div class="bet-card action-card">
+                    <div class="bet-card-label">Spin</div>
+                    <button class="spin-btn @(isSpinning ? "spin-btn-active" : "")"
+                            @onclick="SpinWheel"
+                            disabled="@(isSpinning || betType == null)">
+                        @if (isSpinning)
+                        {
+                            <span class="spinner-ring"></span>
+                            <span>Spinning...</span>
+                        }
+                        else
+                        {
+                            <span>Spin Wheel</span>
+                        }
+                    </button>
+
+                    @if (!string.IsNullOrEmpty(statusMsg))
+                    {
+                        <div class="status-msg @(lastWon ? "msg-win" : "msg-neutral")">@statusMsg</div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly double landingAngle = -90d;
+    private Guid userId = Guid.Empty;
+    private long balance;
+    private readonly int[] chipValues = [10, 25, 50, 100, 250];
+    private readonly int[] wheelSequence = RouletteService.WheelSequence;
+    private int selectedChip = 25;
+    private string? betType;
+    private bool isSpinning;
+    private bool hasResult;
+    private double spinDegrees;
+    private double ballDegrees;
+    private int resultNumber;
+    private string lastResult = string.Empty;
+    private bool lastWon;
+    private string statusMsg = string.Empty;
+    private readonly List<(int Number, string Color)> history = [];
+    private static readonly int[] RedNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+
+    private double SegmentAngle => 360d / wheelSequence.Length;
+    private string WheelTransformStyle => $"transform: rotate({spinDegrees.ToString("F3", CultureInfo.InvariantCulture)}deg);";
+    private string BallTransformStyle => $"transform: rotate({ballDegrees.ToString("F3", CultureInfo.InvariantCulture)}deg) translateY(calc(var(--ball-orbit) * -1));";
+    private string wheelGradient => BuildWheelGradient();
+
+    protected override async Task OnInitializedAsync()
+    {
+        ballDegrees = landingAngle;
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = state.User;
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var idClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (Guid.TryParse(idClaim, out var parsed))
+            {
+                userId = parsed;
+                balance = (await WalletService.GetBalanceAsync(userId)) ?? 0;
+            }
+        }
+    }
+
+    private void SetBet(string type) => betType = type;
+
+    private string GetNumberColor(int n) => n == 0 ? "Zero • Green" : RedNumbers.Contains(n) ? "Red" : "Black";
+
+    private string GetChipColor(int v) => v switch
+    {
+        10 => "blue",
+        25 => "red",
+        50 => "purple",
+        100 => "gold",
+        _ => "black"
+    };
+
+    private string GetBetSummary() => betType switch
+    {
+        "red" => "Red",
+        "black" => "Black",
+        "green" => "Zero",
+        "even" => "Even",
+        "odd" => "Odd",
+        "low" => "Low (1-18)",
+        "high" => "High (19-36)",
+        _ => "Choose a betting option"
+    };
+
+    private async Task SpinWheel()
+    {
+        if (betType is null || isSpinning)
+        {
+            return;
+        }
+
+        if (userId != Guid.Empty)
+        {
+            var placed = await WalletService.TryPlaceBetAsync(userId, selectedChip, $"roulette-bet-{DateTime.UtcNow:yyyyMMddHHmmss}");
+            if (!placed)
+            {
+                statusMsg = "Insufficient chips.";
+                lastWon = false;
+                return;
+            }
+
+            balance -= selectedChip;
+        }
+
+        isSpinning = true;
+        hasResult = false;
+        statusMsg = string.Empty;
+        StateHasChanged();
+        await Task.Delay(80);
+
+        resultNumber = RouletteService.Spin();
+        var resultIndex = RouletteService.GetWheelIndex(resultNumber);
+        var targetPocketAngle = resultIndex * SegmentAngle;
+        var targetWheelStop = NormalizeAngle(landingAngle - targetPocketAngle);
+
+        spinDegrees = spinDegrees + NormalizeAngle(targetWheelStop - NormalizeAngle(spinDegrees)) + 2880d;
+        ballDegrees = ballDegrees + ShortestAngleDelta(landingAngle, NormalizeAngle(ballDegrees)) - 3240d;
+
+        StateHasChanged();
+        await Task.Delay(4700);
+
+        var win = EvaluateBet(resultNumber, betType);
+        var payout = win ? (long)(selectedChip * GetMultiplier(betType)) : 0;
+        if (win && userId != Guid.Empty)
+        {
+            await WalletService.CreditPayoutAsync(userId, payout, $"roulette-payout-{DateTime.UtcNow:yyyyMMddHHmmss}");
+            balance += payout;
+        }
+
+        lastResult = win ? $"Won {payout} chips." : $"Lost {selectedChip} chips.";
+        lastWon = win;
+        statusMsg = $"{resultNumber} {GetNumberColor(resultNumber)} - {lastResult}";
+        hasResult = true;
+        isSpinning = false;
+
+        var color = resultNumber == 0 ? "green" : RedNumbers.Contains(resultNumber) ? "red" : "black";
+        history.Add((resultNumber, color));
+        StateHasChanged();
+    }
+
+    private string GetPocketLabelStyle(int index)
+    {
+        var angle = index * SegmentAngle;
+        return $"transform: rotate({angle.ToString("F3", CultureInfo.InvariantCulture)}deg) translateY(calc(var(--wheel-size) / -2 + 46px));";
+    }
+
+    private string GetPocketNumberStyle(int index)
+    {
+        var angle = index * SegmentAngle;
+        return $"transform: translate(-50%, -50%) rotate({(-angle).ToString("F3", CultureInfo.InvariantCulture)}deg);";
+    }
+
+    private string BuildWheelGradient()
+    {
+        var segments = new List<string>(wheelSequence.Length);
+        for (var i = 0; i < wheelSequence.Length; i++)
+        {
+            var start = i * SegmentAngle;
+            var end = start + SegmentAngle;
+            var color = wheelSequence[i] == 0
+                ? "#0e9f6e"
+                : RedNumbers.Contains(wheelSequence[i])
+                    ? "#c1123f"
+                    : "#161b22";
+            segments.Add($"{color} {start.ToString("F3", CultureInfo.InvariantCulture)}deg {end.ToString("F3", CultureInfo.InvariantCulture)}deg");
+        }
+
+        var startOffset = -(SegmentAngle / 2d);
+        return $"conic-gradient(from {startOffset.ToString("F3", CultureInfo.InvariantCulture)}deg, {string.Join(", ", segments)})";
+    }
+
+    private static bool EvaluateBet(int n, string bet) => bet switch
+    {
+        "red" => RedNumbers.Contains(n),
+        "black" => n != 0 && !RedNumbers.Contains(n),
+        "green" => n == 0,
+        "even" => n != 0 && n % 2 == 0,
+        "odd" => n % 2 == 1,
+        "low" => n is >= 1 and <= 18,
+        "high" => n is >= 19 and <= 36,
+        _ => false
+    };
+
+    private static double GetMultiplier(string bet) => bet == "green" ? 35d : 2d;
+
+    private static double NormalizeAngle(double angle)
+    {
+        var normalized = angle % 360d;
+        return normalized < 0 ? normalized + 360d : normalized;
+    }
+
+    private static double ShortestAngleDelta(double target, double current)
+    {
+        var delta = NormalizeAngle(target) - NormalizeAngle(current);
+        if (delta > 180d)
+        {
+            delta -= 360d;
+        }
+        else if (delta < -180d)
+        {
+            delta += 360d;
+        }
+
+        return delta;
+    }
+}

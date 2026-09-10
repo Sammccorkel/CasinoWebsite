@@ -1,0 +1,229 @@
+@page "/slots/slots"
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthStateProvider
+@inject Chuds2Chads.Services.WalletService WalletService
+@inject Chuds2Chads.Services.SlotsService SlotsService
+
+<PageTitle>Slots – C2C Casino</PageTitle>
+
+<div class="game-page slots-page">
+    <div class="ambient-glow glow-green"></div>
+    <div class="ambient-glow glow-gold"></div>
+
+    <div class="game-header">
+        <a href="/" class="back-link nav-leave-link">&#8592; Back to Casino</a>
+        <h1 class="game-title-header">🎰 <span class="highlight">Slots</span></h1>
+        @if (userId != Guid.Empty)
+        { <div class="balance-pill">💰 @balance chips</div> }
+        else
+        { <div class="balance-pill guest">👤 Guest Mode</div> }
+    </div>
+
+    <div class="slots-center">
+        <!-- Machine -->
+        <div class="slot-machine @(isSpinning ? "machine-shaking" : "") @(bigWin ? "machine-celebrate" : "")">
+            <div class="machine-top">
+                <span class="machine-top-text">C2C SLOTS</span>
+                <div class="top-lights">
+                    @for(int i = 0; i < 7; i++) {
+                        int li = i;
+                        <div class="top-light @(lightsOn ? (li % 2 == 0 ? "light-on-green" : "light-on-gold") : "")"></div>
+                    }
+                </div>
+            </div>
+
+            <!-- Reels -->
+            <div class="reels-window">
+                <div class="reels-frame"></div>
+                @for (int r = 0; r < 3; r++)
+                {
+                    int ri = r;
+                    <div class="reel @(isSpinning ? $"reel-spin reel-spin-{ri}" : "")">
+                        @if (isSpinning)
+                        {
+                            @for (int s = 0; s < 8; s++)
+                            { <div class="reel-symbol blur-symbol">@symbols[Random.Shared.Next(symbols.Length)]</div> }
+                        }
+                        else
+                        {
+                            <div class="reel-symbol @(hasResult && IsWinningReel(ri) ? "symbol-glow" : "")">@displaySymbols[ri]</div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- Win line flash -->
+            @if (hasResult && lastWon)
+            {
+                <div class="win-line-overlay"></div>
+            }
+
+            <!-- Controls -->
+            <div class="machine-controls">
+                <div class="chip-selector">
+                    @foreach (var chip in chipValues)
+                    {
+                        <button class="chip-btn chip-@GetChipColor(chip) @(selectedChip == chip ? "chip-selected" : "")"
+                                @onclick="() => selectedChip = chip" disabled="@isSpinning">@chip</button>
+                    }
+                </div>
+                <button class="spin-btn @(isSpinning ? "spin-btn-active" : "")"
+                        @onclick="PullLever" disabled="@isSpinning">
+                    @if (isSpinning) { <span class="spinner-ring"></span><span>Spinning…</span> }
+                    else { <span>🎰 Pull Lever!</span> }
+                </button>
+                @if (!string.IsNullOrEmpty(statusMsg))
+                {
+                    <div class="status-msg @(lastWon ? "msg-win" : "msg-neutral") @(bigWin ? "msg-bigwin" : "")">
+                        @statusMsg
+                    </div>
+                }
+            </div>
+
+            <!-- Pay table toggle -->
+            <button class="paytable-toggle" @onclick="() => showPaytable = !showPaytable">
+                @(showPaytable ? "Hide" : "Show") Pay Table ▾
+            </button>
+            @if (showPaytable)
+            {
+                <div class="paytable animate-pop">
+                    @foreach (var (sym, mult, label) in payTable)
+                    {
+                        <div class="paytable-row">
+                            <span class="pt-symbols">@sym @sym @sym</span>
+                            <span class="pt-mult">@mult× — @label</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- History -->
+        @if (history.Count > 0)
+        {
+            <div class="slots-history">
+                <h4 class="history-heading">Recent Spins</h4>
+                <div class="history-list">
+                    @foreach (var h in history.TakeLast(8).Reverse())
+                    {
+                        <div class="slots-history-item @(h.Won ? "hist-win" : "hist-loss")">
+                            @h.Symbols[0] @h.Symbols[1] @h.Symbols[2]
+                            <span class="hist-result">@(h.Won ? $"+{h.Payout}" : $"-{h.Bet}")</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private Guid userId = Guid.Empty;
+    private long balance = 0;
+    private readonly int[] chipValues = [10, 25, 50, 100, 250];
+    private int selectedChip = 25;
+    private bool isSpinning = false;
+    private bool hasResult = false;
+    private bool lastWon = false;
+    private bool bigWin = false;
+    private bool lightsOn = false;
+    private bool showPaytable = false;
+    private string statusMsg = "";
+
+    private readonly string[] symbols = ["🍒","🍋","🍊","🍇","⭐","💎","7️⃣","🎰"];
+    private string[] displaySymbols = ["🎰","🎰","🎰"];
+
+    private record SpinHistory(string[] Symbols, bool Won, long Payout, int Bet);
+    private readonly List<SpinHistory> history = new();
+
+    private readonly (string Sym, int Mult, string Label)[] payTable =
+    [
+        ("💎", 50, "JACKPOT"),
+        ("7️⃣", 20, "Lucky Seven"),
+        ("⭐", 10, "Stars"),
+        ("🍇", 5,  "Grapes"),
+        ("🍊", 3,  "Orange"),
+        ("🍋", 2,  "Lemon"),
+        ("🍒", 2,  "Cherries"),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user  = state.User;
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var id = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (Guid.TryParse(id, out var parsed))
+            {
+                userId  = parsed;
+                balance = (await WalletService.GetBalanceAsync(userId)) ?? 0;
+            }
+        }
+        // Start light blink loop
+        _ = BlinkLights();
+    }
+
+    private async Task BlinkLights()
+    {
+        while (true)
+        {
+            lightsOn = !lightsOn;
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(600);
+        }
+    }
+
+    private string GetChipColor(int v) => v switch { 10 => "blue", 25 => "red", 50 => "purple", 100 => "gold", _ => "black" };
+    private bool IsWinningReel(int r) => hasResult && lastWon && displaySymbols[0] == displaySymbols[1] && displaySymbols[1] == displaySymbols[2];
+
+    private async Task PullLever()
+    {
+        if (isSpinning) return;
+        if (userId != Guid.Empty)
+        {
+            bool placed = await WalletService.TryPlaceBetAsync(userId, selectedChip, $"slots-bet-{DateTime.UtcNow:yyyyMMddHHmmss}");
+            if (!placed) { statusMsg = "Insufficient chips."; return; }
+            balance -= selectedChip;
+        }
+        isSpinning = true; hasResult = false; bigWin = false; statusMsg = "";
+        StateHasChanged();
+
+        // Stagger stops: reel 0 stops at 1.2s, reel 1 at 1.8s, reel 2 at 2.4s
+        await Task.Delay(1200);
+        displaySymbols[0] = symbols[Random.Shared.Next(symbols.Length)];
+        StateHasChanged();
+        await Task.Delay(600);
+        displaySymbols[1] = symbols[Random.Shared.Next(symbols.Length)];
+        StateHasChanged();
+        await Task.Delay(600);
+        displaySymbols[2] = symbols[Random.Shared.Next(symbols.Length)];
+        isSpinning = false;
+
+        bool win = displaySymbols[0] == displaySymbols[1] && displaySymbols[1] == displaySymbols[2];
+        long payout = 0;
+        if (win)
+        {
+            var entry = payTable.FirstOrDefault(p => p.Sym == displaySymbols[0]);
+            int mult  = entry != default ? entry.Mult : 2;
+            payout    = selectedChip * mult;
+            bigWin    = mult >= 10;
+            if (userId != Guid.Empty)
+            {
+                await WalletService.CreditPayoutAsync(userId, payout, $"slots-payout-{DateTime.UtcNow:yyyyMMddHHmmss}");
+                balance += payout;
+            }
+            statusMsg = bigWin ? $"💎 JACKPOT! +{payout} chips!" : $"🎉 You win! +{payout} chips!";
+        }
+        else
+        {
+            statusMsg = $"😬 No match. Lost {selectedChip} chips.";
+        }
+
+        lastWon = win; hasResult = true;
+        history.Add(new SpinHistory((string[])displaySymbols.Clone(), win, payout, selectedChip));
+        StateHasChanged();
+    }
+}
